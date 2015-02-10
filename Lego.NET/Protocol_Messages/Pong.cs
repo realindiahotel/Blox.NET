@@ -3,20 +3,20 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using Bitcoin.BitcoinUtilities;
 using System.IO;
+using Bitcoin.BitcoinUtilities;
 
 namespace Bitcoin.Lego.Protocol_Messages
 {
-	public class Ping : Message
+	public class Pong : Message
 	{
 		private ulong _nonce;
-		public Ping(byte[] payload, uint packetMagic = Globals.ProdPacketMagic) : base(payload, 0, true, packetMagic)
+		public Pong(byte[] payload, uint packetMagic = Globals.ProdPacketMagic) : base(payload, 0, true, packetMagic)
 		{
 			
 		}
 
-		public Ping(uint packetMagic = Globals.ProdPacketMagic) : base(packetMagic)
+		public Pong(uint packetMagic = Globals.ProdPacketMagic) : base(packetMagic)
 		{
 			_nonce = Convert.ToUInt64(DateTime.UtcNow.Ticks);
 		}

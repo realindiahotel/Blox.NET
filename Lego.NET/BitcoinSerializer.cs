@@ -21,6 +21,7 @@ namespace Bitcoin.Lego
 			_names.Add(typeof(VersionAck), "verack");
 			_names.Add(typeof(RejectMessage), "reject");
 			_names.Add(typeof(Ping), "ping");
+			_names.Add(typeof(Pong), "pong");
 			/*_names.Add(typeof(InventoryMessage), "inv");
 			_names.Add(typeof(Block), "block");
 			_names.Add(typeof(GetDataMessage), "getdata");
@@ -185,6 +186,10 @@ namespace Bitcoin.Lego
 			if (command.Equals("ping"))
 			{
 				return new Ping(payloadBytes, packetMagic);
+			}
+			if (command.Equals("pong"))
+			{
+				return new Pong(payloadBytes, packetMagic);
 			}
 			/*if (command.Equals("inv"))
 			{

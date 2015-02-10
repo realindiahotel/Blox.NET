@@ -51,6 +51,7 @@
     <Compile Include="P2PConnection.cs" />
     <Compile Include="PeerAddress.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Protocol_Messages\Pong.cs" />
     <Compile Include="Protocol_Messages\Ping.cs" />
     <Compile Include="Protocol_Messages\RejectMessage.cs" />
     <Compile Include="Protocol_Messages\VersionAck.cs" />
