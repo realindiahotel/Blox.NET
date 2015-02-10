@@ -8,7 +8,7 @@ Current Achieved Milestones (Protocol version 70002):
 * Initiating P2P connection
 * Send version
 * Recieve version
-* send verack
-* recieve verack
-* send ping
-* recieve ping
+* Send verack
+* Recieve verack
+* Send ping
+* Recieve ping
