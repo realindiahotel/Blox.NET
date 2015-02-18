@@ -18,7 +18,8 @@ namespace Bitcoin.Lego
 		private VersionMessage _theirVersionMessage;
 		private long _peerTimeOffset;
 		private bool _inbound;
-		private Thread _recieveMessagesThread;		
+		private Thread _recieveMessagesThread;
+		private Thread _heartbeatThread;
 
 		/// <summary>
 		/// New P2PConnection Object
@@ -133,6 +134,11 @@ namespace Bitcoin.Lego
 
 			//add packetMagic for testnet
 			_myVersionMessage = new VersionMessage(RemoteIPAddress, Socket, services, RemotePort, blockHeight, relay);
+
+			//set thread for heartbeat
+			_heartbeatThread = new Thread(new ThreadStart(SendHeartbeat));
+			_heartbeatThread.IsBackground = true;
+			_heartbeatThread.Start();
 		}
 
 		private bool pCheckVerack()
@@ -214,26 +220,47 @@ namespace Bitcoin.Lego
 					}
 				}
 			}));
+			_recieveMessagesThread.IsBackground = true;
 			_recieveMessagesThread.Start();
 		}
 
 		public void CloseConnection()
 		{
+			_heartbeatThread.Abort();
+
 			if (Socket.Connected)
 			{
 				Socket.Close();
 			}
 		}
 
-		public void Send(Message message)
-		{			
+		private void SendHeartbeat()
+		{
+			while (Socket.Connected)
+			{
+				try
+				{
+					Thread.CurrentThread.Join(Globals.HeartbeatTimeout - 30000); //send a heartbeat 30 seconds before the heartbeat timeout
 
+					if (Globals.HeartbeatKeepAlive)
+					{
+						Send(new Ping());
+					}
+				}
+				catch
+				{
+
+				}
+			}
+		}
+
+		public void Send(Message message)
+		{
 			WriteMessage(message);
 		}
 
 		public Message Recieve()
 		{		
-
 			//on testnet send in the different packetMagic
 			return ReadMessage();
 
