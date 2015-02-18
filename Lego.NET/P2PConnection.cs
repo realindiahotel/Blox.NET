@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Net.Sockets;
 using System.Net;
@@ -17,7 +18,7 @@ namespace Bitcoin.Lego
 		private VersionMessage _theirVersionMessage;
 		private long _peerTimeOffset;
 		private bool _inbound;
-		private static List<P2PConnection> _p2pConnections = new List<P2PConnection>();
+		private Thread _recieveMessagesThread;		
 
 		/// <summary>
 		/// New P2PConnection Object
@@ -57,6 +58,9 @@ namespace Bitcoin.Lego
 						{
 							pCheckVerack();
 						}
+
+						//start listening for messages
+						pMessageListener();
 					}
 					else
 					{
@@ -90,6 +94,11 @@ namespace Bitcoin.Lego
 					if (!pVerifyVersionMessage())
 					{
 						CloseConnection();
+					}
+					else
+					{
+						//start listening for messages
+						pMessageListener();
 					}
 
 				}
@@ -161,6 +170,39 @@ namespace Bitcoin.Lego
 			return false;
 		}
 
+		private void pMessageListener()
+		{
+			_recieveMessagesThread = new Thread(new ThreadStart(() =>
+			{
+				while (Socket.Connected)
+				{
+					var message = Recieve();
+
+					//process the message appropriately
+					switch (message.GetType().Name)
+					{
+						case "Ping":
+							//send pong responce to ping
+							Send(new Pong(((Ping)message).Nonce));
+                            break;
+
+						case "Pong":
+							//we have pong
+							Console.WriteLine(((Pong)(message)).Nonce);
+							break;
+
+						case "RejectMessage":
+							Console.WriteLine(((RejectMessage)message).Message + " - " + ((RejectMessage)message).CCode + " - " + ((RejectMessage)message).Reason + " - " + ((RejectMessage)message).Data);
+							break;
+
+						default:
+							break;
+					}
+				}
+			}));
+			_recieveMessagesThread.Start();
+		}
+
 		public void CloseConnection()
 		{
 			if (Socket.Connected)
@@ -222,15 +264,5 @@ namespace Bitcoin.Lego
 				return _inbound;
 			}
 		}
-
-		public static void AddP2PConnection(P2PConnection p2pConnection)
-		{
-			_p2pConnections.Add(p2pConnection);
-		}
-
-		public static List<P2PConnection> GetP2PConnections()
-		{
-			return _p2pConnections;
-		}		
 	}
 }

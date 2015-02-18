@@ -11,6 +11,7 @@ namespace Bitcoin.Lego.Protocol_Messages
 	public class Ping : Message
 	{
 		private ulong _nonce;
+		private byte[] _nonceBytes;
 		public Ping(byte[] payload, uint packetMagic = Globals.ProdPacketMagic) : base(payload, 0, true, packetMagic)
 		{
 			
@@ -28,7 +29,6 @@ namespace Bitcoin.Lego.Protocol_Messages
 
 		protected override void Parse()
 		{
-			//we get the nonce of the ping they sent us, not really necessary but I'm OCD haha
 			_nonce = ReadUint64();
 		}
 

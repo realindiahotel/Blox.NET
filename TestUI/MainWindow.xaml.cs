@@ -24,14 +24,15 @@ namespace TestUI
 	/// </summary>
 	public partial class MainWindow : Window
 	{
-		public MainWindow()
+		P2PConnection p2p;
+        public MainWindow()
 		{
 			InitializeComponent();
 		}
 
 		private void button_Click(object sender, RoutedEventArgs e)
 		{
-			P2PConnection p2p = new P2PConnection(IPAddress.Parse("127.0.0.1"), Globals.TCPMessageTimeout, new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp));
+			 p2p = new P2PConnection(IPAddress.Parse("66.188.35.226"), Globals.TCPMessageTimeout, new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp));
             bool success = p2p.ConnectToPeer(Globals.NodeNetwork,1,Globals.RelayTransactionsAlways,true);
 
 			if (!success)
@@ -50,6 +51,11 @@ namespace TestUI
 		private void button2_Click(object sender, RoutedEventArgs e)
 		{
 			P2PListener.StopListeningForIncomingP2PConnections();
+		}
+
+		private void button3_Click(object sender, RoutedEventArgs e)
+		{
+			p2p.Send(new Bitcoin.Lego.Protocol_Messages.Ping());
 		}
 	}
 }

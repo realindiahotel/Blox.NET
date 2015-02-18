@@ -16,9 +16,9 @@ namespace Bitcoin.Lego.Protocol_Messages
 			
 		}
 
-		public Pong(uint packetMagic = Globals.ProdPacketMagic) : base(packetMagic)
+		public Pong(ulong nonce, uint packetMagic = Globals.ProdPacketMagic) : base(packetMagic)
 		{
-			_nonce = Convert.ToUInt64(DateTime.UtcNow.Ticks);
+			_nonce = nonce;
 		}
 
 		public override void BitcoinSerializeToStream(Stream buf)

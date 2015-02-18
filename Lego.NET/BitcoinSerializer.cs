@@ -22,7 +22,7 @@ namespace Bitcoin.Lego
 			_names.Add(typeof(RejectMessage), "reject");
 			_names.Add(typeof(Ping), "ping");
 			_names.Add(typeof(Pong), "pong");
-			/*_names.Add(typeof(InventoryMessage), "inv");
+			_names.Add(typeof(InventoryMessage), "inv");/*
 			_names.Add(typeof(Block), "block");
 			_names.Add(typeof(GetDataMessage), "getdata");
 			_names.Add(typeof(Transaction), "tx");
@@ -48,8 +48,7 @@ namespace Bitcoin.Lego
 
 			Utilities.Uint32ToByteArrayBe(packetMagic, header, 0);
 
-			// The header array is initialized to zero so we don't have to worry about
-			// NULL terminating the string here.
+			// The header array is initialized to zero so we don't have to worry about NULL terminating the string here.
 			for (var i = 0; i < name.Length && i < _commandLen; i++)
 			{
 				header[4 + i] = (byte)name[i];
@@ -70,7 +69,6 @@ namespace Bitcoin.Lego
 		/// <summary>
 		/// Reads a message from the given InputStream and returns it.
 		/// </summary>
-		/// <exception cref="ProtocolException"/>
 		/// <exception cref="IOException"/>
 		public Message Deserialize(Stream @in, uint packetMagic)
 		{
@@ -167,7 +165,6 @@ namespace Bitcoin.Lego
 			}
 		}
 
-		/// <exception cref="ProtocolException"/>
 		private Message MakeMessage(string command, byte[] payloadBytes, uint packetMagic)
 		{
 			// We use an if ladder rather than reflection because reflection can be slow on some platforms.
@@ -191,10 +188,10 @@ namespace Bitcoin.Lego
 			{
 				return new Pong(payloadBytes, packetMagic);
 			}
-			/*if (command.Equals("inv"))
+			if (command.Equals("inv"))
 			{
-				return new InventoryMessage(payloadBytes);
-			}
+				return new InventoryMessage(payloadBytes, packetMagic);
+			}/*
 			if (command.Equals("block"))
 			{
 				return new Block(_params, payloadBytes);
