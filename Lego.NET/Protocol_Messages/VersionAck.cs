@@ -21,7 +21,6 @@ namespace Bitcoin.Lego.Protocol_Messages
 		{
 		}
 
-		/// <exception cref="ProtocolException"/>
 		protected override void Parse()
 		{
 			// nothing to parse for now

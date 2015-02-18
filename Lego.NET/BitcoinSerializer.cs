@@ -22,11 +22,12 @@ namespace Bitcoin.Lego
 			_names.Add(typeof(RejectMessage), "reject");
 			_names.Add(typeof(Ping), "ping");
 			_names.Add(typeof(Pong), "pong");
-			_names.Add(typeof(InventoryMessage), "inv");/*
+			_names.Add(typeof(InventoryMessage), "inv");
+			_names.Add(typeof(AddressMessage), "addr");
+			_names.Add(typeof(GetAddresses), "getaddr");/*
 			_names.Add(typeof(Block), "block");
 			_names.Add(typeof(GetDataMessage), "getdata");
-			_names.Add(typeof(Transaction), "tx");
-			_names.Add(typeof(AddressMessage), "addr");			
+			_names.Add(typeof(Transaction), "tx");						
 			_names.Add(typeof(GetBlocksMessage), "getblocks");*/
 		}
 
@@ -191,6 +192,14 @@ namespace Bitcoin.Lego
 			if (command.Equals("inv"))
 			{
 				return new InventoryMessage(payloadBytes, packetMagic);
+			}
+			if (command.Equals("addr"))
+			{
+				return new AddressMessage(payloadBytes, packetMagic);
+			}
+			if (command.Equals("getaddr"))
+			{
+				return new GetAddresses(payloadBytes, packetMagic);
 			}/*
 			if (command.Equals("block"))
 			{
@@ -203,11 +212,7 @@ namespace Bitcoin.Lego
 			if (command.Equals("tx"))
 			{
 				return new Transaction(_params, payloadBytes);
-			}
-			if (command.Equals("addr"))
-			{
-				return new AddressMessage(_params, payloadBytes);
-			}			
+			}						
 			*/
 
 			throw new Exception("No support for deserializing message with name " + command);

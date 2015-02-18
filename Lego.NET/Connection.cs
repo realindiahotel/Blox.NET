@@ -57,6 +57,56 @@ namespace Bitcoin.Lego
 			}
 		}
 
+		public static async Task<List<IPAddress>> GetDNSSeedIPAddressesAsync(String[] DNSHosts)
+		{
+			List<IPAddress[]> dnsServerIPArrays = new List<IPAddress[]>();
+			List<IPAddress> ipAddressesOut = new List<IPAddress>();
+
+			foreach (String host in DNSHosts)
+			{
+				IPAddress[] addrs = await Dns.GetHostAddressesAsync(host);
+                dnsServerIPArrays.Add(addrs);
+			}
+
+			foreach (IPAddress[] iparr in dnsServerIPArrays)
+			{
+				foreach (IPAddress ip in iparr)
+				{
+					if (!ipAddressesOut.Contains(ip))
+					{
+						ipAddressesOut.Add(ip);
+					}
+				}
+			}
+
+			return ipAddressesOut;			
+		}
+
+		public static List<IPAddress> GetDNSSeedIPAddresses(String[] DNSHosts)
+		{
+			List<IPAddress[]> dnsServerIPArrays = new List<IPAddress[]>();
+			List<IPAddress> ipAddressesOut = new List<IPAddress>();
+
+			foreach (String host in DNSHosts)
+			{
+
+				dnsServerIPArrays.Add(Dns.GetHostAddresses(host));
+			}
+
+			foreach (IPAddress[] iparr in dnsServerIPArrays)
+			{
+				foreach (IPAddress ip in iparr)
+				{
+					if (!ipAddressesOut.Contains(ip))
+					{
+						ipAddressesOut.Add(ip);
+					}
+				}
+			}
+
+			return ipAddressesOut;
+		}		
+
 		internal BitcoinSerializer Serializer
 		{
 			get

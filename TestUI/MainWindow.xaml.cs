@@ -12,6 +12,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
+using System.Threading;
 using System.Net;
 using Bitcoin.Lego;
 using Bitcoin.BitcoinUtilities;
@@ -56,6 +57,32 @@ namespace TestUI
 		private void button3_Click(object sender, RoutedEventArgs e)
 		{
 			p2p.Send(new Bitcoin.Lego.Protocol_Messages.Ping());
+		}
+
+		private async void button4_Click(object sender, RoutedEventArgs e)
+		{
+			List<IPAddress> ips = await Connection.GetDNSSeedIPAddressesAsync(Globals.DNSSeedHosts);
+			MessageBox.Show(ips.Count.ToString());
+
+		}
+
+		private async void button5_Click(object sender, RoutedEventArgs e)
+		{
+			List<IPAddress> ips = await Connection.GetDNSSeedIPAddressesAsync(Globals.DNSSeedHosts);
+
+			foreach (IPAddress ip in ips)
+			{
+				Thread connectThread = new Thread(new ThreadStart(() =>
+				{
+					P2PConnection p2p = new P2PConnection(ip, Globals.TCPMessageTimeout, new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp));
+					if (p2p.ConnectToPeer(Globals.NodeNetwork, 1, 1, true))
+					{
+						P2PListener.AddP2PConnection(p2p);
+
+					}
+				}));
+				connectThread.Start();
+            }
 		}
 	}
 }

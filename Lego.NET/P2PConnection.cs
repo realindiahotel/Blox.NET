@@ -37,76 +37,83 @@ namespace Bitcoin.Lego
 
 		public bool ConnectToPeer(ulong services, uint blockHeight, int relay, bool strictVerAck)
 		{
-
-			if (_inbound) //the connection is incoming so we recieve their version message first
+			try
 			{
-				pConnectAndSetVersionAndStreams(services,blockHeight,relay);
 
-				var message = Recieve();
-
-				if (message.GetType().Name.Equals("VersionMessage"))
+				if (_inbound) //the connection is incoming so we recieve their version message first
 				{
-					_theirVersionMessage = (VersionMessage)message;
+					pConnectAndSetVersionAndStreams(services, blockHeight, relay);
 
-					//send my version message
-					Send(_myVersionMessage);
+					var message = Recieve();
 
-					//send verack
-					if (pVerifyVersionMessage())
+					if (message.GetType().Name.Equals("VersionMessage"))
 					{
+						_theirVersionMessage = (VersionMessage)message;
+
+						//send my version message
+						Send(_myVersionMessage);
+
+						//send verack
+						if (pVerifyVersionMessage())
+						{
+							if (strictVerAck)
+							{
+								pCheckVerack();
+							}
+
+							//start listening for messages
+							pMessageListener();
+						}
+						else
+						{
+							CloseConnection();
+						}
+
+					}
+					else //something other then their version message...uh oh...not friend... kill the connection
+					{
+						CloseConnection();
+					}
+				}
+				else //the connection is outgoing so we send our version message first
+				{
+					pConnectAndSetVersionAndStreams(services, blockHeight, relay);
+
+					Send(_myVersionMessage);
+					var message = Recieve();
+
+					//we have their version message yay :)
+					if (message.GetType().Name.Equals("VersionMessage"))
+					{
+						_theirVersionMessage = (VersionMessage)message;
+
+						//if strict verack is on we listen for verack and if we don't get it we close the connection
 						if (strictVerAck)
 						{
 							pCheckVerack();
 						}
 
-						//start listening for messages
-						pMessageListener();
+						if (!pVerifyVersionMessage())
+						{
+							CloseConnection();
+						}
+						else
+						{
+							//start listening for messages
+							pMessageListener();
+						}
+
 					}
-					else
+					else //something other then their version message...uh oh...not friend... kill the connection
 					{
 						CloseConnection();
 					}
-
-				}
-				else //something other then their version message...uh oh...not friend... kill the connection
-				{
-					CloseConnection();
 				}
 			}
-			else //the connection is outgoing so we send our version message first
+			catch
 			{
-				pConnectAndSetVersionAndStreams(services,blockHeight,relay);
 
-				Send(_myVersionMessage);
-				var message = Recieve();
-
-				//we have their version message yay :)
-				if (message.GetType().Name.Equals("VersionMessage"))
-				{
-					_theirVersionMessage = (VersionMessage)message;
-					
-					//if strict verack is on we listen for verack and if we don't get it we close the connection
-					if (strictVerAck)
-					{
-						pCheckVerack();
-					}
-
-					if (!pVerifyVersionMessage())
-					{
-						CloseConnection();
-					}
-					else
-					{
-						//start listening for messages
-						pMessageListener();
-					}
-
-				}
-				else //something other then their version message...uh oh...not friend... kill the connection
-				{
-					CloseConnection();
-				}
-			}
+			} 
 
 			return Socket.Connected;
 		}
@@ -176,27 +183,34 @@ namespace Bitcoin.Lego
 			{
 				while (Socket.Connected)
 				{
-					var message = Recieve();
-
-					//process the message appropriately
-					switch (message.GetType().Name)
+					try
 					{
-						case "Ping":
-							//send pong responce to ping
-							Send(new Pong(((Ping)message).Nonce));
-                            break;
+						var message = Recieve();
 
-						case "Pong":
-							//we have pong
-							Console.WriteLine(((Pong)(message)).Nonce);
-							break;
+						//process the message appropriately
+						switch (message.GetType().Name)
+						{
+							case "Ping":
+								//send pong responce to ping
+								Send(new Pong(((Ping)message).Nonce));
+								break;
 
-						case "RejectMessage":
-							Console.WriteLine(((RejectMessage)message).Message + " - " + ((RejectMessage)message).CCode + " - " + ((RejectMessage)message).Reason + " - " + ((RejectMessage)message).Data);
-							break;
+							case "Pong":
+								//we have pong
+								Console.WriteLine(((Pong)(message)).Nonce);
+								break;
 
-						default:
-							break;
+							case "RejectMessage":
+								Console.WriteLine(((RejectMessage)message).Message + " - " + ((RejectMessage)message).CCode + " - " + ((RejectMessage)message).Reason + " - " + ((RejectMessage)message).Data);
+								break;
+
+							default:
+								break;
+						}
+					}
+					catch
+					{
+
 					}
 				}
 			}));
