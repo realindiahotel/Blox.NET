@@ -18,7 +18,6 @@ namespace Bitcoin.Lego
 		private Stream _dataIn;
 		private int _connectionTimeout;
 		private IPEndPoint _remoteEndPoint;
-
 		private readonly IPAddress _remoteIp;
 		private readonly int _remotePort;
 
@@ -136,6 +135,5 @@ namespace Bitcoin.Lego
 				return _remoteEndPoint;
 			}
 		}
-
 	}
 }

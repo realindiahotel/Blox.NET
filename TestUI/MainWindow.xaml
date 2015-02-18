@@ -7,7 +7,9 @@
         mc:Ignorable="d"
         Title="MainWindow" Height="350" Width="525">
     <Grid>
-        <Button x:Name="button" Content="Button" HorizontalAlignment="Left" VerticalAlignment="Top" Width="75" Margin="214,191,0,0" Click="button_Click"/>
+        <Button x:Name="button" Content="Connect to a Peer" HorizontalAlignment="Left" VerticalAlignment="Top" Width="123" Margin="59,137,0,0" Click="button_Click"/>
+        <Button x:Name="button1" Content="Listen for Peers" HorizontalAlignment="Left" Margin="59,200,0,0" VerticalAlignment="Top" Width="123" Click="button1_Click"/>
+        <Button x:Name="button2" Content="Stop Listening" HorizontalAlignment="Left" Margin="59,254,0,0" VerticalAlignment="Top" Width="123" Click="button2_Click"/>
 
     </Grid>
 </Window>

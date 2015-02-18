@@ -139,14 +139,30 @@ namespace Bitcoin.Lego.Protocol_Messages
 			_clientVersion = ReadUint32();
 			_localServices = ReadUint64();
 			_time = ReadUint64();
-			MyAddr = new PeerAddress(Bytes, Cursor, Globals.ClientVersion,true);
+			MyAddr = new PeerAddress(Bytes, Cursor, Globals.ClientVersion, true);
 			Cursor += MyAddr.MessageSize;
 			TheirAddr = new PeerAddress(Bytes, Cursor, _clientVersion, true);
 			Cursor += MyAddr.MessageSize;
 			_nonce = ReadUint64();
 			_userAgent = ReadStr();
 			_startBlockHeight = ReadUint32();
-			_relay = ReadBytes(1)[0];
+			//Relay flag added in 70001
+			if (_clientVersion >= 70001)
+			{
+				try
+				{
+					_relay = ReadBytes(1)[0];
+				}
+				catch
+				{
+					//I think if the relay is '0' it gets seen as end of data with the rest of the trailing 0's so this fixes that if we can't read the 0 make it 0 anyway
+					_relay = Globals.RelayTransactionsOnDemand;
+				}
+			}
+			else
+			{
+				_relay = Globals.RelayTransactionsAlways;
+			}
 		}
 
 		/// <exception cref="IOException"/>

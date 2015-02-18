@@ -12,8 +12,10 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
+using System.Net;
 using Bitcoin.Lego;
 using Bitcoin.BitcoinUtilities;
+using System.Net.Sockets;
 
 namespace TestUI
 {
@@ -29,8 +31,8 @@ namespace TestUI
 
 		private void button_Click(object sender, RoutedEventArgs e)
 		{
-			P2PConnection p2p = new P2PConnection(System.Net.IPAddress.Parse("108.61.123.187"), 60000);
-            bool success = p2p.Connect(Globals.NodeNetwork,1,Globals.RelayTransactionsAlways,true);
+			P2PConnection p2p = new P2PConnection(IPAddress.Parse("127.0.0.1"), Globals.TCPMessageTimeout, new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp));
+            bool success = p2p.ConnectToPeer(Globals.NodeNetwork,1,Globals.RelayTransactionsAlways,true);
 
 			if (!success)
 			{
@@ -38,6 +40,16 @@ namespace TestUI
 			}
 
 
+		}
+
+		private void button1_Click(object sender, RoutedEventArgs e)
+		{
+			P2PListener.ListenForIncomingP2PConnections(IPAddress.Any);
+		}
+
+		private void button2_Click(object sender, RoutedEventArgs e)
+		{
+			P2PListener.StopListeningForIncomingP2PConnections();
 		}
 	}
 }

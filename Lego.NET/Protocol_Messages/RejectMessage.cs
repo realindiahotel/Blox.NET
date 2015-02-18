@@ -65,7 +65,7 @@ namespace Bitcoin.Lego.Protocol_Messages
 
 		}
 
-		public RejectMessage(string message, ccode ccode, string reason, string data, uint packetMagic = Globals.ProdPacketMagic) :base(packetMagic)
+		public RejectMessage(string message, ccode ccode, string reason, string data="", uint packetMagic = Globals.ProdPacketMagic) :base(packetMagic)
 		{
 			_message = message;
 			_ccode = ccode;

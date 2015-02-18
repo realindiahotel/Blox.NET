@@ -212,6 +212,7 @@ namespace Bitcoin.Lego
 				return new AddressMessage(_params, payloadBytes);
 			}			
 			*/
+
 			throw new Exception("No support for deserializing message with name " + command);
 		}
 

@@ -47,6 +47,7 @@
   <ItemGroup>
     <Compile Include="BitcoinSerializer.cs" />
     <Compile Include="Connection.cs" />
+    <Compile Include="P2PListener.cs" />
     <Compile Include="Protocol_Messages\Message.cs" />
     <Compile Include="P2PConnection.cs" />
     <Compile Include="PeerAddress.cs" />
