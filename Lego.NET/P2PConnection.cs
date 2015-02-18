@@ -20,6 +20,8 @@ namespace Bitcoin.Lego
 		private bool _inbound;
 		private Thread _recieveMessagesThread;
 		private Thread _heartbeatThread;
+		private Thread _killDeadClientNoHeartbeatThread;
+		private DateTime _lastRecievedMessage;
 
 		/// <summary>
 		/// New P2PConnection Object
@@ -136,9 +138,14 @@ namespace Bitcoin.Lego
 			_myVersionMessage = new VersionMessage(RemoteIPAddress, Socket, services, RemotePort, blockHeight, relay);
 
 			//set thread for heartbeat
-			_heartbeatThread = new Thread(new ThreadStart(SendHeartbeat));
+			_heartbeatThread = new Thread(new ThreadStart(pSendHeartbeat));
 			_heartbeatThread.IsBackground = true;
 			_heartbeatThread.Start();
+
+			//set thread for kill on no heartbeat
+			_killDeadClientNoHeartbeatThread = new Thread(new ThreadStart(pNoHeartbeatKillDeadClient));
+			_killDeadClientNoHeartbeatThread.IsBackground = true;
+			_killDeadClientNoHeartbeatThread.Start();
 		}
 
 		private bool pCheckVerack()
@@ -226,7 +233,23 @@ namespace Bitcoin.Lego
 
 		public void CloseConnection()
 		{
-			_heartbeatThread.Abort();
+			try
+			{
+				_heartbeatThread.Abort();
+			}
+			catch
+			{
+
+			}
+
+			try
+			{
+				_killDeadClientNoHeartbeatThread.Abort();
+			}
+			catch
+			{
+
+			}
 
 			if (Socket.Connected)
 			{
@@ -234,7 +257,7 @@ namespace Bitcoin.Lego
 			}
 		}
 
-		private void SendHeartbeat()
+		private void pSendHeartbeat()
 		{
 			while (Socket.Connected)
 			{
@@ -254,6 +277,38 @@ namespace Bitcoin.Lego
 			}
 		}
 
+		private void pNoHeartbeatKillDeadClient()
+		{
+			int timeWait = Globals.HeartbeatTimeout;
+
+            while (Socket.Connected)
+			{
+				try
+				{
+					Thread.CurrentThread.Join(timeWait);
+
+					if (Globals.DeadIfNoHeartbeat)
+					{
+						TimeSpan timeLapsed = DateTime.UtcNow - _lastRecievedMessage;
+
+						TimeSpan timeOut = new TimeSpan(timeWait*10000);
+
+						if (timeLapsed > timeOut)
+						{
+							//no heartbeat time to kill connection
+							CloseConnection();
+						}
+
+						timeWait = Globals.HeartbeatTimeout - Convert.ToInt32(timeLapsed.TotalMilliseconds);
+					}
+				}
+				catch
+				{
+
+				}
+			}
+		}
+
 		public void Send(Message message)
 		{
 			WriteMessage(message);
@@ -261,9 +316,9 @@ namespace Bitcoin.Lego
 
 		public Message Recieve()
 		{		
-			//on testnet send in the different packetMagic
-			return ReadMessage();
-
+			var msg = ReadMessage();
+			_lastRecievedMessage = DateTime.UtcNow;
+			return msg;
 		}
 
 		public VersionMessage MyVersionMessage

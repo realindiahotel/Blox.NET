@@ -34,7 +34,7 @@ namespace TestUI
 		private void button_Click(object sender, RoutedEventArgs e)
 		{
 			 p2p = new P2PConnection(IPAddress.Parse("66.188.35.226"), Globals.TCPMessageTimeout, new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp));
-            bool success = p2p.ConnectToPeer(Globals.NodeNetwork,1,Globals.RelayTransactionsAlways,true);
+            bool success = p2p.ConnectToPeer(((ulong)Globals.Services.NODE_NETWORK),1,((int)Globals.Relay.RELAY_ALWAYS),true);
 
 			if (!success)
 			{
@@ -75,7 +75,7 @@ namespace TestUI
 				Thread connectThread = new Thread(new ThreadStart(() =>
 				{
 					P2PConnection p2p = new P2PConnection(ip, Globals.TCPMessageTimeout, new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp));
-					if (p2p.ConnectToPeer(Globals.NodeNetwork, 1, 1, true))
+					if (p2p.ConnectToPeer(((ulong)Globals.Services.NODE_NETWORK), 1, 1, true))
 					{
 						P2PListener.AddP2PConnection(p2p);
 

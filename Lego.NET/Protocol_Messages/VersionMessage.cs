@@ -156,12 +156,12 @@ namespace Bitcoin.Lego.Protocol_Messages
 				catch
 				{
 					//I think if the relay is '0' it gets seen as end of data with the rest of the trailing 0's so this fixes that if we can't read the 0 make it 0 anyway
-					_relay = Globals.RelayTransactionsOnDemand;
+					_relay = ((int)Globals.Relay.RELAY_ON_DEMAND);
 				}
 			}
 			else
 			{
-				_relay = Globals.RelayTransactionsAlways;
+				_relay = ((int)Globals.Relay.RELAY_ALWAYS);
 			}
 		}
 
@@ -195,8 +195,8 @@ namespace Bitcoin.Lego.Protocol_Messages
 		/// </summary>
 		public bool HasBlockChain()
 		{
-			return (LocalServices & Globals.NodeNetwork) == Globals.NodeNetwork;
-		}
+			return (LocalServices & ((ulong)Globals.Services.NODE_NETWORK)) == ((ulong)Globals.Services.NODE_NETWORK);
+        }
 	}
 }
 
