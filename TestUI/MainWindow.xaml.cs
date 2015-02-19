@@ -12,6 +12,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
+using System.Runtime;
 using System.Threading;
 using System.Net;
 using Bitcoin.Lego;
@@ -33,15 +34,19 @@ namespace TestUI
 
 		private void button_Click(object sender, RoutedEventArgs e)
 		{
-			 p2p = new P2PConnection(IPAddress.Parse("66.188.35.226"), Globals.TCPMessageTimeout, new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp));
-            bool success = p2p.ConnectToPeer(((ulong)Globals.Services.NODE_NETWORK),1,((int)Globals.Relay.RELAY_ALWAYS),true);
-
-			if (!success)
+			Thread connectThread = new Thread(new ThreadStart(() =>
 			{
-				MessageBox.Show("Not connected");
-			}
+				p2p = new P2PConnection(IPAddress.Parse("60.241.62.116"), Globals.TCPMessageTimeout, new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp));
+                bool success = p2p.ConnectToPeer(((ulong)Globals.Services.NODE_NETWORK), 1, ((int)Globals.Relay.RELAY_ALWAYS), true);
 
+				if (!success)
+				{
+					MessageBox.Show("Not connected");
+				}
+			}));
 
+			connectThread.IsBackground = true;
+			connectThread.Start();
 		}
 
 		private void button1_Click(object sender, RoutedEventArgs e)
@@ -81,8 +86,15 @@ namespace TestUI
 
 					}
 				}));
+				connectThread.IsBackground = true;
 				connectThread.Start();
             }
+		}
+
+		private async void button6_Click(object sender, RoutedEventArgs e)
+		{
+			PeerAddress myip = await Connection.GetMyExternalIPAsync((ulong)Globals.Services.NODE_NETWORK);
+			MessageBox.Show(myip.ToString());
 		}
 	}
 }

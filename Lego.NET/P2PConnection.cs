@@ -59,6 +59,7 @@ namespace Bitcoin.Lego
 						//send verack
 						if (pVerifyVersionMessage())
 						{
+
 							if (strictVerAck)
 							{
 								pCheckVerack();
@@ -69,13 +70,13 @@ namespace Bitcoin.Lego
 						}
 						else
 						{
-							CloseConnection();
+							CloseConnection(true);
 						}
 
 					}
 					else //something other then their version message...uh oh...not friend... kill the connection
 					{
-						CloseConnection();
+						CloseConnection(true);
 					}
 				}
 				else //the connection is outgoing so we send our version message first
@@ -98,7 +99,7 @@ namespace Bitcoin.Lego
 
 						if (!pVerifyVersionMessage())
 						{
-							CloseConnection();
+							CloseConnection(true);
 						}
 						else
 						{
@@ -109,7 +110,7 @@ namespace Bitcoin.Lego
 					}
 					else //something other then their version message...uh oh...not friend... kill the connection
 					{
-						CloseConnection();
+						CloseConnection(true);
 					}
 				}
 			}
@@ -154,7 +155,7 @@ namespace Bitcoin.Lego
 
 			if (!message.GetType().Name.Equals("VersionAck"))
 			{
-				CloseConnection();
+				CloseConnection(true);
 				return false;
 			}
 
@@ -177,6 +178,11 @@ namespace Bitcoin.Lego
 				{
 					//their time sucks sent a reject message and close connection
 					Send(new RejectMessage("version", RejectMessage.ccode.REJECT_INVALID, "Your unix timestamp is fucked up", ""));
+					return false;
+				}
+				else if (_theirVersionMessage.Nonce==_myVersionMessage.Nonce && !Globals.AllowP2PConnectToSelf)
+				{
+					Send(new RejectMessage("version", RejectMessage.ccode.REJECT_DUPLICATE, "Connecting to self has been disabled", ""));
 					return false;
 				}
 				else //we're good send verack
@@ -231,7 +237,7 @@ namespace Bitcoin.Lego
 			_recieveMessagesThread.Start();
 		}
 
-		public void CloseConnection()
+		public void CloseConnection(bool forget=false)
 		{
 			try
 			{
@@ -254,6 +260,11 @@ namespace Bitcoin.Lego
 			if (Socket.Connected)
 			{
 				Socket.Close();
+			}
+
+			if (forget)
+			{
+				P2PListener.RemoveP2PConnection(this);
 			}
 		}
 
@@ -296,7 +307,7 @@ namespace Bitcoin.Lego
 						if (timeLapsed > timeOut)
 						{
 							//no heartbeat time to kill connection
-							CloseConnection();
+							CloseConnection(true);
 						}
 
 						timeWait = Globals.HeartbeatTimeout - Convert.ToInt32(timeLapsed.TotalMilliseconds);

@@ -29,7 +29,7 @@ namespace Bitcoin.Lego
 					_socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
 					_socket.LingerState = lo;
 					_listening = true;
-					_localEndPoint = new IPEndPoint(ipInterfaceToBind, Globals.LocalP2PListeningPort);
+					_localEndPoint = new IPEndPoint(ipInterfaceToBind, portToBind);
 					if (_socket.IsBound)
 					{
 						_socket.Close();
@@ -97,7 +97,14 @@ namespace Bitcoin.Lego
 
 		public static void RemoveP2PConnection(P2PConnection p2pConnection)
 		{
-			_p2pConnections.Remove(p2pConnection);
+			try
+			{
+				_p2pConnections.Remove(p2pConnection);
+			}
+			catch
+			{
+
+			}
 		}
 
 		public static List<P2PConnection> GetP2PConnections()

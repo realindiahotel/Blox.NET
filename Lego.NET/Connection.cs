@@ -8,6 +8,7 @@ using System.Net;
 using System.Net.Sockets;
 using Bitcoin.BitcoinUtilities;
 using Bitcoin.Lego.Protocol_Messages;
+using HtmlAgilityPack;
 
 namespace Bitcoin.Lego
 {
@@ -55,6 +56,39 @@ namespace Bitcoin.Lego
 			{
 				_serializer.Serialize(message, _dataOut);
 			}
+		}
+
+		public static async Task<PeerAddress> GetMyExternalIPAsync(ulong services, int port = Globals.LocalP2PListeningPort)
+		{
+			try
+			{
+				if (Globals.AdvertiseExternalIP)
+				{
+					WebClient webCli = new WebClient();
+					String page = await webCli.DownloadStringTaskAsync(new Uri("http://checkip.dyndns.org",UriKind.Absolute));
+
+					if (!page.Equals(""))
+					{
+						HtmlDocument pg = new HtmlDocument();
+						pg.LoadHtml(page);
+						string ip = pg.DocumentNode.SelectSingleNode("//body").InnerText.Split(new char[] { ':' })[1].Trim();
+
+						if ((ip.Split(new char[] { '.' }).Length == 4))
+						{
+							return new PeerAddress(IPAddress.Parse(ip), port, services, Globals.ClientVersion, false);
+						}
+					}
+
+					
+
+				}
+			}
+			catch
+			{
+
+			}
+			//when all else fails just return localhost
+			return new PeerAddress(IPAddress.Parse("127.0.0.1"), port, services, Globals.ClientVersion, false);					
 		}
 
 		public static async Task<List<IPAddress>> GetDNSSeedIPAddressesAsync(String[] DNSHosts)
