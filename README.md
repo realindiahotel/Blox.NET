@@ -3,6 +3,8 @@ A C# full node for processing the Bitcoin block chain
 
 NOT READY FOR USE - STILL UNDER ACTIVE DEVELOPMENT
 
+PLEASE ENSURE YOU ALSO DOWNLOAD, BUILD AND REFERENCE THE BitcoinUtilities.NET PROJECT LOCATED HERE: https://github.com/Thashiznets/BitcoinUtilities.NET 
+
 Current Achieved Milestones (Protocol version 70002):
 
 * Listening and Accepting P2P connections
