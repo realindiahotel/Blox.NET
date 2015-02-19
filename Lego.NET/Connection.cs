@@ -60,35 +60,122 @@ namespace Bitcoin.Lego
 
 		public static async Task<PeerAddress> GetMyExternalIPAsync(ulong services, int port = Globals.LocalP2PListeningPort)
 		{
-			try
+			//todo eventually create a ip checker in Azure controlled by us for Lego (but others can use as well)
+			if (Globals.AdvertiseExternalIP)
 			{
-				if (Globals.AdvertiseExternalIP)
+				String page = "";
+
+				using (WebClient webCli = new WebClient())
 				{
-					WebClient webCli = new WebClient();
-					String page = await webCli.DownloadStringTaskAsync(new Uri("http://checkip.dyndns.org",UriKind.Absolute));
-
-					if (!page.Equals(""))
+					try
 					{
-						HtmlDocument pg = new HtmlDocument();
-						pg.LoadHtml(page);
-						string ip = pg.DocumentNode.SelectSingleNode("//body").InnerText.Split(new char[] { ':' })[1].Trim();
-
-						if ((ip.Split(new char[] { '.' }).Length == 4))
+						page = await webCli.DownloadStringTaskAsync(new Uri("http://checkip.dyndns.org", UriKind.Absolute));
+						if (!page.Equals(""))
 						{
-							return new PeerAddress(IPAddress.Parse(ip), port, services, Globals.ClientVersion, false);
+							HtmlDocument pg = new HtmlDocument();
+							pg.LoadHtml(page);
+							string ip = pg.DocumentNode.SelectSingleNode("//body").InnerText.Split(new char[] { ':' })[1].Trim();
+
+							if ((ip.Split(new char[] { '.' }).Length == 4) || (ip.Split(new char[] { ':' }).Length == 8))
+							{
+								return new PeerAddress(IPAddress.Parse(ip), port, services, Globals.ClientVersion, false);
+							}
 						}
 					}
+					catch
+					{
+						//allows falling through to next http request
+					}
 
-					
+					try
+					{
+						page = await webCli.DownloadStringTaskAsync(new Uri("http://www.showmemyip.com", UriKind.Absolute));
 
+						if (!page.Equals(""))
+						{
+							HtmlDocument pg = new HtmlDocument();
+							pg.LoadHtml(page);
+							string ip = pg.DocumentNode.SelectSingleNode("//title").InnerText.Split(new char[] { ':' })[1].Trim();
+
+							if (!(ip.Split(new char[] { '.' }).Length == 4) || (ip.Split(new char[] { ':' }).Length == 8))
+							{
+								ip = pg.DocumentNode.SelectSingleNode("//span[@id=\"IPAddress\"]").InnerText.Trim();
+							}
+
+							if ((ip.Split(new char[] { '.' }).Length == 4) || (ip.Split(new char[] { ':' }).Length == 8))
+							{
+								return new PeerAddress(IPAddress.Parse(ip), port, services, Globals.ClientVersion, false);
+							}
+						}
+					}
+					catch
+					{
+						//allows falling through to using localhost
+					}
 				}
-			}
-			catch
-			{
-
 			}
 			//when all else fails just return localhost
 			return new PeerAddress(IPAddress.Parse("127.0.0.1"), port, services, Globals.ClientVersion, false);					
+		}
+
+		public static PeerAddress GetMyExternalIP(ulong services, int port = Globals.LocalP2PListeningPort)
+		{
+			//todo eventually create a ip checker in Azure controlled by us for Lego (but others can use as well)
+			if (Globals.AdvertiseExternalIP)
+			{
+				String page = "";
+
+				using (WebClient webCli = new WebClient())
+				{
+					try
+					{
+						page = webCli.DownloadString(new Uri("http://checkip.dyndns.org", UriKind.Absolute));
+						if (!page.Equals(""))
+						{
+							HtmlDocument pg = new HtmlDocument();
+							pg.LoadHtml(page);
+							string ip = pg.DocumentNode.SelectSingleNode("//body").InnerText.Split(new char[] { ':' })[1].Trim();
+
+							if ((ip.Split(new char[] { '.' }).Length == 4) || (ip.Split(new char[] { ':' }).Length == 8))
+							{
+								return new PeerAddress(IPAddress.Parse(ip), port, services, Globals.ClientVersion, false);
+							}
+						}
+					}
+					catch
+					{
+						//allows falling through to next http request
+					}
+
+					try
+					{
+						page = webCli.DownloadString(new Uri("http://www.showmemyip.com", UriKind.Absolute));
+
+						if (!page.Equals(""))
+						{
+							HtmlDocument pg = new HtmlDocument();
+							pg.LoadHtml(page);
+							string ip = pg.DocumentNode.SelectSingleNode("//title").InnerText.Split(new char[] { ':' })[1].Trim();
+
+							if (!(ip.Split(new char[] { '.' }).Length == 4) || (ip.Split(new char[] { ':' }).Length == 8))
+							{
+								ip = pg.DocumentNode.SelectSingleNode("//span[@id=\"IPAddress\"]").InnerText.Trim();
+							}
+
+							if ((ip.Split(new char[] { '.' }).Length == 4) || (ip.Split(new char[] { ':' }).Length == 8))
+							{
+								return new PeerAddress(IPAddress.Parse(ip), port, services, Globals.ClientVersion, false);
+							}
+						}
+					}
+					catch
+					{
+						//allows falling through to using localhost
+					}
+				}
+			}
+			//when all else fails just return localhost
+			return new PeerAddress(IPAddress.Parse("127.0.0.1"), port, services, Globals.ClientVersion, false);
 		}
 
 		public static async Task<List<IPAddress>> GetDNSSeedIPAddressesAsync(String[] DNSHosts)
