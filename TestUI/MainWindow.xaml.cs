@@ -16,6 +16,7 @@ using System.Runtime;
 using System.Threading;
 using System.Net;
 using Bitcoin.Lego;
+using Bitcoin.Lego.Network;
 using Bitcoin.BitcoinUtilities;
 using System.Net.Sockets;
 

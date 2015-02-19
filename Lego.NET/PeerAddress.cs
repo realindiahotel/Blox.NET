@@ -12,8 +12,7 @@ using Bitcoin.Lego.Protocol_Messages;
 namespace Bitcoin.Lego
 {
 	/// <summary>
-	/// A PeerAddress holds an IP address and port number representing the network location of
-	/// a peer in the BitCoin P2P network. It exists primarily for serialization purposes.
+	/// A PeerAddress holds an IP address and port number representing the network location of a peer in the BitCoin P2P network.
 	/// </summary>
 	[Serializable]
 	public class PeerAddress : Message
@@ -27,7 +26,6 @@ namespace Bitcoin.Lego
 		/// <summary>
 		/// Construct a peer address from a serialized payload.
 		/// </summary>
-		/// <exception cref="ProtocolException"/>
 		public PeerAddress(byte[] payload, int offset, uint protocolVersion, bool isInVersionMessage, uint packetMagic = Globals.ProdPacketMagic)
 			: base(payload, offset, false, packetMagic, protocolVersion)
 		{

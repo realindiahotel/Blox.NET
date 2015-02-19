@@ -9,7 +9,7 @@ using System.IO;
 using Bitcoin.BitcoinUtilities;
 using System.Threading;
 
-namespace Bitcoin.Lego
+namespace Bitcoin.Lego.Network
 {
 	public static class P2PListener
 	{

@@ -10,7 +10,7 @@ using System.IO;
 using Bitcoin.BitcoinUtilities;
 using Bitcoin.Lego.Protocol_Messages;
 
-namespace Bitcoin.Lego
+namespace Bitcoin.Lego.Network
 {
     public class P2PConnection : Connection
     {
@@ -274,7 +274,7 @@ namespace Bitcoin.Lego
 			{
 				try
 				{
-					Thread.CurrentThread.Join(Globals.HeartbeatTimeout - 30000); //send a heartbeat 30 seconds before the heartbeat timeout
+					Thread.CurrentThread.Join(Globals.HeartbeatTimeout); //send a heartbeat after the specified interval
 
 					if (Globals.HeartbeatKeepAlive)
 					{
@@ -290,7 +290,7 @@ namespace Bitcoin.Lego
 
 		private void pNoHeartbeatKillDeadClient()
 		{
-			int timeWait = Globals.HeartbeatTimeout;
+			int timeWait = (Globals.HeartbeatTimeout * 3); //90 minutes for kill (3 times specified heartbeat signal) so I just multiply heartbeat by 3
 
             while (Socket.Connected)
 			{
@@ -310,7 +310,7 @@ namespace Bitcoin.Lego
 							CloseConnection(true);
 						}
 
-						timeWait = Globals.HeartbeatTimeout - Convert.ToInt32(timeLapsed.TotalMilliseconds);
+						timeWait = (Globals.HeartbeatTimeout*3) - Convert.ToInt32(timeLapsed.TotalMilliseconds);
 					}
 				}
 				catch

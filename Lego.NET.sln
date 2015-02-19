@@ -9,6 +9,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Lego.NET", "Lego.NET\Lego.N
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BitcoinUtilities.NET", "..\BitcoinUtilities.NET\BitcoinUtilities.NET\BitcoinUtilities.NET\BitcoinUtilities.NET.csproj", "{E054C08C-8B6E-4767-999B-F7DE5F8A1E94}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Lego.NET.Longarm", "Lego.NET.Longarm\Lego.NET.Longarm.csproj", "{9A1CB207-2086-4B58-A4B7-6535404FC50D}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -27,6 +29,10 @@ Global
 		{E054C08C-8B6E-4767-999B-F7DE5F8A1E94}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{E054C08C-8B6E-4767-999B-F7DE5F8A1E94}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{E054C08C-8B6E-4767-999B-F7DE5F8A1E94}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9A1CB207-2086-4B58-A4B7-6535404FC50D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9A1CB207-2086-4B58-A4B7-6535404FC50D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9A1CB207-2086-4B58-A4B7-6535404FC50D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9A1CB207-2086-4B58-A4B7-6535404FC50D}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

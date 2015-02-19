@@ -10,7 +10,7 @@ using Bitcoin.BitcoinUtilities;
 using Bitcoin.Lego.Protocol_Messages;
 using HtmlAgilityPack;
 
-namespace Bitcoin.Lego
+namespace Bitcoin.Lego.Network
 {
 	public class Connection
 	{
@@ -61,7 +61,8 @@ namespace Bitcoin.Lego
 		public static async Task<PeerAddress> GetMyExternalIPAsync(ulong services, int port = Globals.LocalP2PListeningPort)
 		{
 			//todo eventually create a ip checker in Azure controlled by us for Lego (but others can use as well)
-			if (Globals.AdvertiseExternalIP)
+
+			if (Globals.AdvertiseExternalIP) //I envisiage a scenario behind the onion or something where we don't want inadvertant IP leaky, may be usefull later if we create something other than P2P.
 			{
 				String page = "";
 
@@ -120,7 +121,7 @@ namespace Bitcoin.Lego
 
 		public static PeerAddress GetMyExternalIP(ulong services, int port = Globals.LocalP2PListeningPort)
 		{
-			//todo eventually create a ip checker in Azure controlled by us for Lego (but others can use as well)
+
 			if (Globals.AdvertiseExternalIP)
 			{
 				String page = "";
@@ -176,6 +177,8 @@ namespace Bitcoin.Lego
 			}
 			//when all else fails just return localhost
 			return new PeerAddress(IPAddress.Parse("127.0.0.1"), port, services, Globals.ClientVersion, false);
+
+			//'Live Wire' - https://soundcloud.com/excision/live-wire
 		}
 
 		public static async Task<List<IPAddress>> GetDNSSeedIPAddressesAsync(String[] DNSHosts)
@@ -200,7 +203,21 @@ namespace Bitcoin.Lego
 				}
 			}
 
+			//make sure I always have at least 200 seed nodes to check against
+			pGetHardcodedFillerIPs(ref ipAddressesOut);
+
 			return ipAddressesOut;			
+		}
+
+		private static void pGetHardcodedFillerIPs(ref List<IPAddress> ipAddressesOut)
+		{
+			Random notCryptoRandom = new Random(DateTime.Now.Millisecond);
+
+			for (int i = 0; i < (200 - ipAddressesOut.Count); i++)
+			{
+				int rIndx = notCryptoRandom.Next(0, (HardSeedList.SeedIPStrings.Length-1));
+				ipAddressesOut.Add(IPAddress.Parse(HardSeedList.SeedIPStrings[rIndx]));
+			}
 		}
 
 		public static List<IPAddress> GetDNSSeedIPAddresses(String[] DNSHosts)
@@ -224,6 +241,9 @@ namespace Bitcoin.Lego
 					}
 				}
 			}
+
+			//make sure I always have at least 200 seed nodes to check against
+			pGetHardcodedFillerIPs(ref ipAddressesOut);
 
 			return ipAddressesOut;
 		}		
