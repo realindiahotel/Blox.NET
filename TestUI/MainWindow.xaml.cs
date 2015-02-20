@@ -37,7 +37,7 @@ namespace TestUI
 		{
 			Thread connectThread = new Thread(new ThreadStart(() =>
 			{
-				p2p = new P2PConnection(IPAddress.Parse("60.241.62.116"), Globals.TCPMessageTimeout, new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp));
+				p2p = new P2PConnection(IPAddress.Parse("66.175.221.254"), Globals.TCPMessageTimeout, new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp));
                 bool success = p2p.ConnectToPeer(((ulong)Globals.Services.NODE_NETWORK), 1, ((int)Globals.Relay.RELAY_ALWAYS), true);
 
 				if (!success)
@@ -67,14 +67,14 @@ namespace TestUI
 
 		private async void button4_Click(object sender, RoutedEventArgs e)
 		{
-			List<IPAddress> ips = await Connection.GetDNSSeedIPAddressesAsync(Globals.DNSSeedHosts);
+			List<IPAddress> ips = await P2PConnection.GetDNSSeedIPAddressesAsync(Globals.DNSSeedHosts);
 			MessageBox.Show(ips.Count.ToString());
 
 		}
 
 		private async void button5_Click(object sender, RoutedEventArgs e)
 		{
-			List<IPAddress> ips = await Connection.GetDNSSeedIPAddressesAsync(Globals.DNSSeedHosts);
+			List<IPAddress> ips = await P2PConnection.GetDNSSeedIPAddressesAsync(Globals.DNSSeedHosts);
 
 			foreach (IPAddress ip in ips)
 			{

@@ -116,7 +116,7 @@ namespace Bitcoin.Lego.Network
 				}
 			}
 			//when all else fails just return localhost
-			return new PeerAddress(IPAddress.Parse("127.0.0.1"), port, services, Globals.ClientVersion, false);					
+			return new PeerAddress(IPAddress.Parse("127.0.0.1"), Globals.ProdP2PPort, services, Globals.ClientVersion, false);					
 		}
 
 		public static PeerAddress GetMyExternalIP(ulong services, int port = Globals.LocalP2PListeningPort)
@@ -179,74 +179,7 @@ namespace Bitcoin.Lego.Network
 			return new PeerAddress(IPAddress.Parse("127.0.0.1"), port, services, Globals.ClientVersion, false);
 
 			//'Live Wire' - https://soundcloud.com/excision/live-wire
-		}
-
-		public static async Task<List<IPAddress>> GetDNSSeedIPAddressesAsync(String[] DNSHosts)
-		{
-			List<IPAddress[]> dnsServerIPArrays = new List<IPAddress[]>();
-			List<IPAddress> ipAddressesOut = new List<IPAddress>();
-
-			foreach (String host in DNSHosts)
-			{
-				IPAddress[] addrs = await Dns.GetHostAddressesAsync(host);
-                dnsServerIPArrays.Add(addrs);
-			}
-
-			foreach (IPAddress[] iparr in dnsServerIPArrays)
-			{
-				foreach (IPAddress ip in iparr)
-				{
-					if (!ipAddressesOut.Contains(ip))
-					{
-						ipAddressesOut.Add(ip);
-					}
-				}
-			}
-
-			//make sure I always have at least 200 seed nodes to check against
-			pGetHardcodedFillerIPs(ref ipAddressesOut);
-
-			return ipAddressesOut;			
-		}
-
-		private static void pGetHardcodedFillerIPs(ref List<IPAddress> ipAddressesOut)
-		{
-			Random notCryptoRandom = new Random(DateTime.Now.Millisecond);
-
-			for (int i = 0; i < (200 - ipAddressesOut.Count); i++)
-			{
-				int rIndx = notCryptoRandom.Next(0, (HardSeedList.SeedIPStrings.Length-1));
-				ipAddressesOut.Add(IPAddress.Parse(HardSeedList.SeedIPStrings[rIndx]));
-			}
-		}
-
-		public static List<IPAddress> GetDNSSeedIPAddresses(String[] DNSHosts)
-		{
-			List<IPAddress[]> dnsServerIPArrays = new List<IPAddress[]>();
-			List<IPAddress> ipAddressesOut = new List<IPAddress>();
-
-			foreach (String host in DNSHosts)
-			{
-
-				dnsServerIPArrays.Add(Dns.GetHostAddresses(host));
-			}
-
-			foreach (IPAddress[] iparr in dnsServerIPArrays)
-			{
-				foreach (IPAddress ip in iparr)
-				{
-					if (!ipAddressesOut.Contains(ip))
-					{
-						ipAddressesOut.Add(ip);
-					}
-				}
-			}
-
-			//make sure I always have at least 200 seed nodes to check against
-			pGetHardcodedFillerIPs(ref ipAddressesOut);
-
-			return ipAddressesOut;
-		}		
+		}	
 
 		internal BitcoinSerializer Serializer
 		{

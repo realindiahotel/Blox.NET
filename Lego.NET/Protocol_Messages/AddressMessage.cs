@@ -23,6 +23,11 @@ namespace Bitcoin.Lego.Protocol_Messages
 		{
 		}
 
+		internal AddressMessage(List<PeerAddress> payloadAddresses, uint packetMagic = Globals.ProdPacketMagic) : base(packetMagic)
+		{
+			Addresses = payloadAddresses;
+		}
+
 		protected override void Parse()
 		{
 			var numAddresses = ReadVarInt();

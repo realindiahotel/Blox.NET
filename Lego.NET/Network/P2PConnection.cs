@@ -21,6 +21,7 @@ namespace Bitcoin.Lego.Network
 		private Thread _recieveMessagesThread;
 		private Thread _heartbeatThread;
 		private Thread _killDeadClientNoHeartbeatThread;
+		private Thread _addrFartThread;
 		private DateTime _lastRecievedMessage;
 
 		/// <summary>
@@ -42,6 +43,8 @@ namespace Bitcoin.Lego.Network
 		{
 			try
 			{
+				_addrFartThread = new Thread(new ThreadStart(pSendAddrFart));
+				_addrFartThread.IsBackground = true;	
 
 				if (_inbound) //the connection is incoming so we recieve their version message first
 				{
@@ -59,11 +62,10 @@ namespace Bitcoin.Lego.Network
 						//send verack
 						if (pVerifyVersionMessage())
 						{
+							//it seems accepting the conection is sufficient as no one is sending me veracks on incoming connection so I won't check for verack
 
-							if (strictVerAck)
-							{
-								pCheckVerack();
-							}
+							//send addr ang getaddr
+							_addrFartThread.Start();
 
 							//start listening for messages
 							pMessageListener();
@@ -97,12 +99,16 @@ namespace Bitcoin.Lego.Network
 							pCheckVerack();
 						}
 
-						if (!pVerifyVersionMessage())
+						//not sending verack as seems only a connection recipient acceptee does that
+						if (!pVerifyVersionMessage(false))
 						{
 							CloseConnection(true);
 						}
 						else
 						{
+							//send addr and getaddr will also happen every 24 hrs by default
+							_addrFartThread.Start();
+
 							//start listening for messages
 							pMessageListener();
 						}
@@ -162,7 +168,7 @@ namespace Bitcoin.Lego.Network
 			return true;
 		}
 
-		private bool pVerifyVersionMessage()
+		private bool pVerifyVersionMessage(bool sendVerack=true)
 		{
 			//I have their version so time to make sure everything is ok and either verack or reject
 			if (_theirVersionMessage != null && Socket.Connected)
@@ -187,7 +193,10 @@ namespace Bitcoin.Lego.Network
 				}
 				else //we're good send verack
 				{
-					Send(new VersionAck());
+					if (sendVerack)
+					{
+						Send(new VersionAck());
+					}
 					return true;
 				}
 				
@@ -223,7 +232,12 @@ namespace Bitcoin.Lego.Network
 								Console.WriteLine(((RejectMessage)message).Message + " - " + ((RejectMessage)message).CCode + " - " + ((RejectMessage)message).Reason + " - " + ((RejectMessage)message).Data);
 								break;
 
-							default:
+							case "GetAddresses":
+								PeerAddress _my_net_addr = Connection.GetMyExternalIP(_myVersionMessage.LocalServices);
+								Send(new AddressMessage(new List<PeerAddress>() { _my_net_addr }));
+								break;
+
+							default: //if it's something we don't know about we just ignore it
 								break;
 						}
 					}
@@ -266,6 +280,25 @@ namespace Bitcoin.Lego.Network
 			{
 				P2PListener.RemoveP2PConnection(this);
 			}
+		}
+
+		private void pSendAddrFart()
+		{
+			while (Socket.Connected)
+			{
+				try
+				{		
+					PeerAddress _my_net_addr = Connection.GetMyExternalIP(_myVersionMessage.LocalServices);
+					Send(new AddressMessage(new List<PeerAddress>() {_my_net_addr }));
+					Send(new GetAddresses());
+					Thread.CurrentThread.Join(Globals.AddrFartInterval);
+				}
+				catch
+				{
+
+				}
+			}
+
 		}
 
 		private void pSendHeartbeat()
@@ -318,6 +351,73 @@ namespace Bitcoin.Lego.Network
 
 				}
 			}
+		}
+
+		public static async Task<List<IPAddress>> GetDNSSeedIPAddressesAsync(String[] DNSHosts)
+		{
+			List<IPAddress[]> dnsServerIPArrays = new List<IPAddress[]>();
+			List<IPAddress> ipAddressesOut = new List<IPAddress>();
+
+			foreach (String host in DNSHosts)
+			{
+				IPAddress[] addrs = await Dns.GetHostAddressesAsync(host);
+				dnsServerIPArrays.Add(addrs);
+			}
+
+			foreach (IPAddress[] iparr in dnsServerIPArrays)
+			{
+				foreach (IPAddress ip in iparr)
+				{
+					if (!ipAddressesOut.Contains(ip))
+					{
+						ipAddressesOut.Add(ip);
+					}
+				}
+			}
+
+			//make sure I always have at least 200 seed nodes to check against
+			pGetHardcodedFillerIPs(ref ipAddressesOut);
+
+			return ipAddressesOut;
+		}
+
+		private static void pGetHardcodedFillerIPs(ref List<IPAddress> ipAddressesOut)
+		{
+			Random notCryptoRandom = new Random(DateTime.Now.Millisecond);
+
+			for (int i = 0; i < (200 - ipAddressesOut.Count); i++)
+			{
+				int rIndx = notCryptoRandom.Next(0, (HardSeedList.SeedIPStrings.Length - 1));
+				ipAddressesOut.Add(IPAddress.Parse(HardSeedList.SeedIPStrings[rIndx]));
+			}
+		}
+
+		public static List<IPAddress> GetDNSSeedIPAddresses(String[] DNSHosts)
+		{
+			List<IPAddress[]> dnsServerIPArrays = new List<IPAddress[]>();
+			List<IPAddress> ipAddressesOut = new List<IPAddress>();
+
+			foreach (String host in DNSHosts)
+			{
+
+				dnsServerIPArrays.Add(Dns.GetHostAddresses(host));
+			}
+
+			foreach (IPAddress[] iparr in dnsServerIPArrays)
+			{
+				foreach (IPAddress ip in iparr)
+				{
+					if (!ipAddressesOut.Contains(ip))
+					{
+						ipAddressesOut.Add(ip);
+					}
+				}
+			}
+
+			//make sure I always have at least 200 seed nodes to check against
+			pGetHardcodedFillerIPs(ref ipAddressesOut);
+
+			return ipAddressesOut;
 		}
 
 		public void Send(Message message)

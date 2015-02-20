@@ -17,8 +17,8 @@ namespace Bitcoin.Lego
 	[Serializable]
 	public class PeerAddress : Message
 	{
-		internal IPAddress Addr { get; private set; }
-		internal int Port { get; private set; }
+		private IPAddress _addr;
+		private int _port;
 		private ulong _services;
 		private uint _time;
 		private bool _isInVersionMessage;
@@ -26,8 +26,7 @@ namespace Bitcoin.Lego
 		/// <summary>
 		/// Construct a peer address from a serialized payload.
 		/// </summary>
-		public PeerAddress(byte[] payload, int offset, uint protocolVersion, bool isInVersionMessage, uint packetMagic = Globals.ProdPacketMagic)
-			: base(payload, offset, false, packetMagic, protocolVersion)
+		public PeerAddress(byte[] payload, int offset, uint protocolVersion, bool isInVersionMessage, uint packetMagic = Globals.ProdPacketMagic):base(payload, offset, false, packetMagic, protocolVersion)
 		{
 			_isInVersionMessage = isInVersionMessage;
 			Parse();
@@ -38,30 +37,22 @@ namespace Bitcoin.Lego
 		/// </summary>
 		public PeerAddress(IPAddress addr, int port, ulong services, uint protocolVersion = Globals.ClientVersion, bool isInVersionMessage = false)
 		{
-			Addr = addr;
-			Port = port;
+			_addr = addr;
+			_port = port;
+			_time = ((uint)Utilities.ToUnixTime(DateTime.UtcNow));
 			ProtocolVersion = protocolVersion;
 			_services = services;
 			_isInVersionMessage = isInVersionMessage;
 		}
 
-		
-		public PeerAddress(IPEndPoint addr, ulong services)
-			: this(addr.Address, addr.Port, services)
-		{
-		}
-
-		/// <exception cref="IOException"/>
 		public override void BitcoinSerializeToStream(Stream stream)
 		{
-			//this is fucked up...version messages will not have uint32 timestamp so must find a way to strip from version message
 			if (ProtocolVersion >= 31402 && !_isInVersionMessage)
-			{
-				var secs = Utilities.ToUnixTime(DateTime.UtcNow);
-				Utilities.Uint32ToByteStreamLe((uint)secs, stream);
+			{				
+				Utilities.Uint32ToByteStreamLe(_time, stream);
 			}
 			Utilities.Uint64ToByteStreamLe(_services, stream); // nServices.
-			var ipBytes = Addr.GetAddressBytes();
+			var ipBytes = _addr.GetAddressBytes();
 			if (ipBytes.Length == 4)
 			{
 				var v6Addr = new byte[16];
@@ -72,8 +63,8 @@ namespace Bitcoin.Lego
 			}
 			stream.Write(ipBytes, 0, ipBytes.Length);
 			// And write out the port. Unlike the rest of the protocol, address and port is in big endian byte order.
-			stream.Write((new byte[] { (byte)(Port >> 8) }), 0, (new byte[] { (byte)(Port >> 8) }).Length);
-			stream.Write((new byte[] { (byte)Port }),0, (new byte[] { (byte)Port }).Length);
+			stream.Write((new byte[] { (byte)(_port >> 8) }), 0, (new byte[] { (byte)(_port >> 8) }).Length);
+			stream.Write((new byte[] { (byte)_port }),0, (new byte[] { (byte)_port }).Length);
 		}
 
 		protected override void Parse()
@@ -102,15 +93,57 @@ namespace Bitcoin.Lego
 				Array.Copy(addrBytes, 12, newBytes, 0, 4);
 				addrBytes = newBytes;
 			}
-			Addr = new IPAddress(addrBytes);
-			Port = (Bytes[Cursor++] << 8) | Bytes[Cursor++];
+			_addr = new IPAddress(addrBytes);
+			_port = (Bytes[Cursor++] << 8) | Bytes[Cursor++];
 
 			Bytes = null;
 		}
 
 		public override string ToString()
 		{
-			return "[" + Addr + "]:" + Port;
+			return "[" + _addr + "]:" + _port;
+		}
+
+		public IPAddress IPAddress
+		{
+			get
+			{
+				return _addr;
+			}
+		}
+
+		public int Port
+		{
+			get
+			{
+				return _port;
+			}
+		}
+
+		public uint Time
+		{
+			get
+			{
+				return _time;
+			}
+
+			set
+			{
+				_time = value;
+			}
+		}
+
+		public ulong Services
+		{
+			get
+			{
+				return _services;
+			}	
+
+			set
+			{
+				_services = value;
+			}
 		}
 	}
 }
