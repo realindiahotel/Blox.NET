@@ -1,5 +1,5 @@
 # Lego.NET
-A C# full node for processing the Bitcoin block chain, aim is to have the Lego.NET library contain all the business logic/database interface and then Lego.NET.Arcus is a Worker Service that has TCP:8333 defined up in Azure and it will run as a full node service in Azure. Lego.NET.Nacreous is a Web API/ASP.NET front end which will be an exposed endpoint for accepting HTTP requests to control Arcus.
+A C# full node for processing the Bitcoin block chain.
 
 NOT READY FOR USE - STILL UNDER ACTIVE DEVELOPMENT
 
