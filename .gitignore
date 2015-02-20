@@ -144,6 +144,9 @@ packages/*
 csx/
 *.build.csdef
 
+# Custom Lego Sensitive Stuffs Here
+DB_PWD.txt 
+
 # Windows Store app package directory
 AppPackages/
 
