@@ -1,5 +1,5 @@
 # Lego.NET
-A C# full node for processing the Bitcoin block chain
+A C# full node for processing the Bitcoin block chain.
 
 NOT READY FOR USE - STILL UNDER ACTIVE DEVELOPMENT
 
