@@ -65,10 +65,23 @@ namespace Bitcoin.Lego.Network
 					_listenThread.IsBackground = true;
 					_listenThread.Start();
 				}
+#if (!DEBUG)
 				catch
 				{
 					_listening = false;
 				}
+#else
+				catch (Exception ex)
+				{
+					_listening = false;
+
+					Console.WriteLine("Exception: " + ex.Message);
+					if (ex.InnerException != null)
+					{
+						Console.WriteLine("Inner Exception: " + ex.InnerException.Message);
+					}
+				}
+#endif
 			}
 
 			return _listening;
@@ -82,10 +95,23 @@ namespace Bitcoin.Lego.Network
 			
 				_socket.Close();
             }
+#if (!DEBUG)
 			catch
 			{
 				return false;
 			}
+#else
+			catch (Exception ex)
+			{
+				Console.WriteLine("Exception: " + ex.Message);
+				if (ex.InnerException != null)
+				{
+					Console.WriteLine("Inner Exception: " + ex.InnerException.Message);
+				}
+
+				return false;
+			}
+#endif
 
 			return true;
 		}
@@ -101,10 +127,21 @@ namespace Bitcoin.Lego.Network
 			{
 				_p2pConnections.Remove(p2pConnection);
 			}
+#if (!DEBUG)
 			catch
 			{
 
 			}
+#else
+			catch (Exception ex)
+			{
+				Console.WriteLine("Exception: " + ex.Message);
+				if (ex.InnerException != null)
+				{
+					Console.WriteLine("Inner Exception: " + ex.InnerException.Message);
+				}
+			}
+#endif
 		}
 
 		public static List<P2PConnection> GetP2PConnections()

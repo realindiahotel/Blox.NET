@@ -9,11 +9,9 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Lego.NET", "Lego.NET\Lego.N
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BitcoinUtilities.NET", "..\BitcoinUtilities.NET\BitcoinUtilities.NET\BitcoinUtilities.NET\BitcoinUtilities.NET.csproj", "{E054C08C-8B6E-4767-999B-F7DE5F8A1E94}"
 EndProject
-Project("{CC5FD16D-436D-48AD-A40C-5A424C6E3E79}") = "Lego.NET.Mammatus", "Lego.NET.Mammatus\Lego.NET.Mammatus.ccproj", "{1DD1E624-BA64-4C2F-B67A-529157FA5928}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Lego.NET.Bipolar", "Lego.NET.Bipolar\Lego.NET.Bipolar.csproj", "{A51BA7C3-A320-497B-8DFA-8E28EC01FF99}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Lego.NET.Nacreous", "Lego.NET.Nacreous\Lego.NET.Nacreous.csproj", "{6F2053B2-F370-4501-B616-D24563F6DD1D}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Lego.NET.Arcus", "Lego.NET.Arcus\Lego.NET.Arcus.csproj", "{5E32271A-B966-44FE-8AC7-1B200F3B1840}"
+Project("{00D1A9C2-B5F0-4AF3-8072-F6C62B433612}") = "Lego.NET.Data", "Lego.NET.Data\Lego.NET.Data.sqlproj", "{8A52C4B0-6E5B-4831-B837-B4A97FF38C21}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -33,18 +31,16 @@ Global
 		{E054C08C-8B6E-4767-999B-F7DE5F8A1E94}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{E054C08C-8B6E-4767-999B-F7DE5F8A1E94}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{E054C08C-8B6E-4767-999B-F7DE5F8A1E94}.Release|Any CPU.Build.0 = Release|Any CPU
-		{1DD1E624-BA64-4C2F-B67A-529157FA5928}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{1DD1E624-BA64-4C2F-B67A-529157FA5928}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{1DD1E624-BA64-4C2F-B67A-529157FA5928}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{1DD1E624-BA64-4C2F-B67A-529157FA5928}.Release|Any CPU.Build.0 = Release|Any CPU
-		{6F2053B2-F370-4501-B616-D24563F6DD1D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{6F2053B2-F370-4501-B616-D24563F6DD1D}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{6F2053B2-F370-4501-B616-D24563F6DD1D}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{6F2053B2-F370-4501-B616-D24563F6DD1D}.Release|Any CPU.Build.0 = Release|Any CPU
-		{5E32271A-B966-44FE-8AC7-1B200F3B1840}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{5E32271A-B966-44FE-8AC7-1B200F3B1840}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{5E32271A-B966-44FE-8AC7-1B200F3B1840}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{5E32271A-B966-44FE-8AC7-1B200F3B1840}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A51BA7C3-A320-497B-8DFA-8E28EC01FF99}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A51BA7C3-A320-497B-8DFA-8E28EC01FF99}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A51BA7C3-A320-497B-8DFA-8E28EC01FF99}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A51BA7C3-A320-497B-8DFA-8E28EC01FF99}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8A52C4B0-6E5B-4831-B837-B4A97FF38C21}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8A52C4B0-6E5B-4831-B837-B4A97FF38C21}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8A52C4B0-6E5B-4831-B837-B4A97FF38C21}.Debug|Any CPU.Deploy.0 = Debug|Any CPU
+		{8A52C4B0-6E5B-4831-B837-B4A97FF38C21}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8A52C4B0-6E5B-4831-B837-B4A97FF38C21}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8A52C4B0-6E5B-4831-B837-B4A97FF38C21}.Release|Any CPU.Deploy.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

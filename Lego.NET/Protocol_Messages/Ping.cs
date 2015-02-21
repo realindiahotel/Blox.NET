@@ -11,7 +11,6 @@ namespace Bitcoin.Lego.Protocol_Messages
 	public class Ping : Message
 	{
 		private ulong _nonce;
-		private byte[] _nonceBytes;
 		public Ping(byte[] payload, uint packetMagic = Globals.ProdPacketMagic) : base(payload, 0, true, packetMagic)
 		{
 			

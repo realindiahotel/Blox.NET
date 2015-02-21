@@ -28,6 +28,7 @@ namespace Bitcoin.Lego
 		/// </summary>
 		public PeerAddress(byte[] payload, int offset, uint protocolVersion, bool isInVersionMessage, uint packetMagic = Globals.ProdPacketMagic):base(payload, offset, false, packetMagic, protocolVersion)
 		{
+			ProtocolVersion = protocolVersion;
 			_isInVersionMessage = isInVersionMessage;
 			Parse();
 		}
@@ -40,6 +41,16 @@ namespace Bitcoin.Lego
 			_addr = addr;
 			_port = port;
 			_time = ((uint)Utilities.ToUnixTime(DateTime.UtcNow));
+			ProtocolVersion = protocolVersion;
+			_services = services;
+			_isInVersionMessage = isInVersionMessage;
+		}
+
+		public PeerAddress(IPAddress addr, int port, ulong services, uint time, uint protocolVersion = Globals.ClientVersion, bool isInVersionMessage = false)
+		{
+			_addr = addr;
+			_port = port;
+			_time = time;
 			ProtocolVersion = protocolVersion;
 			_services = services;
 			_isInVersionMessage = isInVersionMessage;

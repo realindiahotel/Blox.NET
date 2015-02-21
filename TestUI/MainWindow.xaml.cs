@@ -18,6 +18,7 @@ using System.Net;
 using Bitcoin.Lego;
 using Bitcoin.Lego.Network;
 using Bitcoin.BitcoinUtilities;
+using Bitcoin.Lego.Data_Interface;
 using System.Net.Sockets;
 
 namespace TestUI
@@ -37,7 +38,7 @@ namespace TestUI
 		{
 			Thread connectThread = new Thread(new ThreadStart(() =>
 			{
-				p2p = new P2PConnection(IPAddress.Parse("66.175.221.254"), Globals.TCPMessageTimeout, new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp));
+				p2p = new P2PConnection(IPAddress.Parse("191.239.64.47"), Globals.TCPMessageTimeout, new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp));
                 bool success = p2p.ConnectToPeer(((ulong)Globals.Services.NODE_NETWORK), 1, ((int)Globals.Relay.RELAY_ALWAYS), true);
 
 				if (!success)
@@ -96,6 +97,11 @@ namespace TestUI
 		{
 			PeerAddress myip = await Connection.GetMyExternalIPAsync((ulong)Globals.Services.NODE_NETWORK);
 			MessageBox.Show(myip.ToString());
+		}
+
+		private void button7_Click(object sender, RoutedEventArgs e)
+		{
+			MessageBox.Show(new DatabaseConnection().ConnectionString);
 		}
 	}
 }

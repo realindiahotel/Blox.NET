@@ -60,9 +60,10 @@ namespace Bitcoin.Lego.Protocol_Messages
 			}
 		}
 
-		internal Message(uint packetMagic = Globals.ProdPacketMagic)
+		internal Message(uint packetMagic = Globals.ProdPacketMagic, uint protocolVersion = Globals.ClientVersion)
 		{
 			_packetMagic = packetMagic;
+			_protocolVersion = protocolVersion;
 		}
 		
 		internal Message(byte[] msg, int offset, bool runParse, uint packetMagic = Globals.ProdPacketMagic, uint protocolVersion = Globals.ClientVersion)
