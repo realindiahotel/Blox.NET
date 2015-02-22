@@ -30,7 +30,7 @@ namespace Lego.NET.Bipolar
 
 		public void StarteMe()
 		{
-			P2PListener.ListenForIncomingP2PConnections(IPAddress.Any);
+			P2PConnectionManager.ListenForIncomingP2PConnections(IPAddress.Any);
 		}
 	}
 }

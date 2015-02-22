@@ -15,9 +15,9 @@ namespace Bitcoin.Lego.Data_Interface
 {
 	/// <summary>
 	/// A static class designed for interfacing with an SQL Server DB, whether that is in the cloud or local is up to you :)
-	/// DEVS PLEASE ENSURE PARAMETERS ARE USED AND NOT JUST APPENDING STRINGS TO BUILD QUERIES AS THIS WILL PROTECT FROM SQL INJECTION ATTACKS THANKS THASHIZNETS <3
+	/// DEVS PLEASE ENSURE PARAMETERS ARE USED AND NOT JUST APPENDING STRINGS TO BUILD QUERIES AS THIS WILL PROTECT FROM SQL INJECTION ATTACKS THANKS THASHIZNETS
 	/// </summary>
-	public class DatabaseConnection
+	public class DatabaseConnection :IDisposable
 	{
 		private String _connectionString = @"Data Source=(localdb)\MSSQLLocalDB;Initial Catalog=LegoDB;Integrated Security=True;Connect Timeout=60;Encrypt=False;TrustServerCertificate=False";
 		private SqlConnection _sqlConnectionObj;
@@ -47,7 +47,7 @@ namespace Bitcoin.Lego.Data_Interface
 #else
 			catch (Exception ex)
 			{
-                Console.WriteLine("Exception: "+ex.Message);
+                Console.WriteLine("Exception Close Connection: "+ex.Message);
 				if (ex.InnerException != null)
 				{
 					Console.WriteLine("Inner Exception: " + ex.InnerException.Message);
@@ -68,14 +68,14 @@ namespace Bitcoin.Lego.Data_Interface
 					_sqlConnectionObj.Close();
 				}
 #if (!DEBUG)
-			catch
-			{
+				catch
+				{
 
-			}
+				}
 #else
 				catch (Exception ex)
 				{
-					Console.WriteLine("Exception: " + ex.Message);
+					Console.WriteLine("Exception Open Connection 1: " + ex.Message);
 					if (ex.InnerException != null)
 					{
 						Console.WriteLine("Inner Exception: " + ex.InnerException.Message);
@@ -95,7 +95,7 @@ namespace Bitcoin.Lego.Data_Interface
 #else
 				catch (Exception ex)
 				{
-					Console.WriteLine("Exception: " + ex.Message);
+					Console.WriteLine("Exception Open Connection 2: " + ex.Message);
 					if (ex.InnerException != null)
 					{
 						Console.WriteLine("Inner Exception: " + ex.InnerException.Message);
@@ -159,7 +159,7 @@ namespace Bitcoin.Lego.Data_Interface
 #else
 			catch (Exception ex)
 			{
-				Console.WriteLine("Exception: " + ex.Message);
+				Console.WriteLine("Exception Add Address: " + ex.Message);
 				if (ex.InnerException != null)
 				{
 					Console.WriteLine("Inner Exception: " + ex.InnerException.Message);
@@ -204,7 +204,7 @@ namespace Bitcoin.Lego.Data_Interface
 #else
 			catch (Exception ex)
 			{
-				Console.WriteLine("Exception: " + ex.Message);
+				Console.WriteLine("Exception Is Address Known: " + ex.Message);
 				if (ex.InnerException != null)
 				{
 					Console.WriteLine("Inner Exception: " + ex.InnerException.Message);
@@ -224,12 +224,15 @@ namespace Bitcoin.Lego.Data_Interface
 					OpenDBConnection();
 				}
 
-				SqlCommand updAddrCmd = new SqlCommand("UPDATE [AddressPool] SET [Time]=@Param1;", _sqlConnectionObj);
-				updAddrCmd.CommandTimeout = 15000;
-				updAddrCmd.Parameters.Add(new SqlParameter("@Param1", Convert.ToInt32(time)));
-				if (updAddrCmd.ExecuteNonQuery() >= 1)
+				using (SqlCommand updAddrCmd = new SqlCommand("UPDATE [AddressPool] SET [Time]=@Param1 WHERE [IPAddress]=@Param2;", _sqlConnectionObj))
 				{
-					return true;
+					updAddrCmd.CommandTimeout = 15000;
+					updAddrCmd.Parameters.Add(new SqlParameter("@Param1", Convert.ToInt32(time)));
+					updAddrCmd.Parameters.Add(new SqlParameter("@Param2", addressToUpdate.IPAddress.ToString()));
+					if (updAddrCmd.ExecuteNonQuery() >= 1)
+					{
+						return true;
+					}
 				}
 			}
 #if (!DEBUG)
@@ -240,7 +243,7 @@ namespace Bitcoin.Lego.Data_Interface
 #else
 			catch (Exception ex)
 			{
-				Console.WriteLine("Exception: " + ex.Message);
+				Console.WriteLine("Exception Update Address: " + ex.Message);
 				if (ex.InnerException != null)
 				{
 					Console.WriteLine("Inner Exception: " + ex.InnerException.Message);
@@ -253,43 +256,92 @@ namespace Bitcoin.Lego.Data_Interface
 
 		private bool GetAddress(String ip, ref PeerAddress addressToGet)
 		{
-            try
+			try
 			{
 				if (!IsOpen)
 				{
 					OpenDBConnection();
 				}
 
-				SqlCommand getAddrCmd = new SqlCommand("SELECT * FROM [AddressPool] WHERE [IPAddress]=@Param1;", _sqlConnectionObj);
-				getAddrCmd.Parameters.Add(new SqlParameter("@Param1", ip));
-				SqlDataReader dataReader = getAddrCmd.ExecuteReader();
-
-				if (dataReader.Read())
+				using (SqlCommand getAddrCmd = new SqlCommand("SELECT * FROM [AddressPool] WHERE [IPAddress]=@Param1;", _sqlConnectionObj))
 				{
-					addressToGet = new PeerAddress(IPAddress.Parse(dataReader.GetString(0)), dataReader.GetInt32(3), Convert.ToUInt64(dataReader.GetInt64(2)), Convert.ToUInt32(dataReader.GetInt32(1)),Globals.ClientVersion, false);
-					dataReader.Close();
-					return true;
+					getAddrCmd.Parameters.Add(new SqlParameter("@Param1", ip));
+
+					using (SqlDataReader dataReader = getAddrCmd.ExecuteReader())
+					{
+
+						if (dataReader.Read())
+						{
+							addressToGet = new PeerAddress(IPAddress.Parse(dataReader.GetString(0)), dataReader.GetInt32(3), Convert.ToUInt64(dataReader.GetInt64(2)), Convert.ToUInt32(dataReader.GetInt32(1)), Globals.ClientVersion, false);
+							dataReader.Close();
+							return true;
+						}
+
+						dataReader.Close();
+					}
 				}
-
-				dataReader.Close();
 			}
-#if (!DEBUG)
-			catch
-			{
-
-			}
-#else
 			catch (Exception ex)
 			{
-				Console.WriteLine("Exception: " + ex.Message);
+				if (ex.Message.ToLower().Contains("deadlock"))
+				{
+					return GetAddress(ip, ref addressToGet);
+				}
+#if(DEBUG)
+				Console.WriteLine("Exception Get Address DB: " + ex.Message);
 				if (ex.InnerException != null)
 				{
 					Console.WriteLine("Inner Exception: " + ex.InnerException.Message);
 				}
-			}
 #endif
+			}
 
 			return false;
+		}
+
+		public List<PeerAddress> GetTopXAddresses(int countx)
+		{
+			List<PeerAddress> addressesOut = new List<PeerAddress>();
+
+			try
+			{
+				if (!IsOpen)
+				{
+					OpenDBConnection();
+				}
+
+				using (SqlCommand getAddrCmd = new SqlCommand("SELECT TOP @Param1 FROM [AddressPool] ORDER BY [Time] DESC;", _sqlConnectionObj))
+				{
+					getAddrCmd.Parameters.Add(new SqlParameter("@Param1", countx));
+
+					using (SqlDataReader dataReader = getAddrCmd.ExecuteReader())
+					{
+
+						while(dataReader.Read())
+						{
+							addressesOut.Add(new PeerAddress(IPAddress.Parse(dataReader.GetString(0)), dataReader.GetInt32(3), Convert.ToUInt64(dataReader.GetInt64(2)), Convert.ToUInt32(dataReader.GetInt32(1)), Globals.ClientVersion, false));
+							
+						}
+						dataReader.Close();
+					}
+				}
+			}
+			catch (Exception ex)
+			{
+				if (ex.Message.ToLower().Contains("deadlock"))
+				{
+					return GetTopXAddresses(countx);
+				}
+#if (DEBUG)
+				Console.WriteLine("Exception Get Address DB: " + ex.Message);
+				if (ex.InnerException != null)
+				{
+					Console.WriteLine("Inner Exception: " + ex.InnerException.Message);
+				}
+#endif
+			}
+
+			return addressesOut;
 		}
 
 		public String ConnectionString
@@ -302,6 +354,11 @@ namespace Bitcoin.Lego.Data_Interface
 			{
 				_connectionString = value;
 			}
+		}
+
+		public void Dispose()
+		{
+			_sqlConnectionObj.Close();
 		}
 	}
 }

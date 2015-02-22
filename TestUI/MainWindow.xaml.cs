@@ -38,8 +38,8 @@ namespace TestUI
 		{
 			Thread connectThread = new Thread(new ThreadStart(() =>
 			{
-				p2p = new P2PConnection(IPAddress.Parse("191.239.64.47"), Globals.TCPMessageTimeout, new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp));
-                bool success = p2p.ConnectToPeer(((ulong)Globals.Services.NODE_NETWORK), 1, ((int)Globals.Relay.RELAY_ALWAYS), true);
+				p2p = new P2PConnection(IPAddress.Parse("98.70.226.168"), Globals.TCPMessageTimeout, new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp));
+                bool success = p2p.ConnectToPeer(((ulong)Globals.Services.NODE_NETWORK), 1, ((int)Globals.Relay.RELAY_ALWAYS));
 
 				if (!success)
 				{
@@ -49,16 +49,30 @@ namespace TestUI
 
 			connectThread.IsBackground = true;
 			connectThread.Start();
+
+			Thread threadLable = new Thread(new ThreadStart(() =>
+			{
+				while (true)
+				{
+					Dispatcher.Invoke(() =>
+					{
+						label.Content = "Inbound: " + P2PConnectionManager.GetInboundP2PConnections().Count + " Outbound: " + P2PConnectionManager.GetOutboundP2PConnections().Count;
+					});
+					Thread.CurrentThread.Join(1000);
+				}
+			}));
+			threadLable.IsBackground = true;
+			threadLable.Start();
 		}
 
 		private void button1_Click(object sender, RoutedEventArgs e)
 		{
-			P2PListener.ListenForIncomingP2PConnections(IPAddress.Any);
+			P2PConnectionManager.ListenForIncomingP2PConnections(IPAddress.Any);
 		}
 
 		private void button2_Click(object sender, RoutedEventArgs e)
 		{
-			P2PListener.StopListeningForIncomingP2PConnections();
+			P2PConnectionManager.StopListeningForIncomingP2PConnections();
 		}
 
 		private void button3_Click(object sender, RoutedEventArgs e)
@@ -77,14 +91,28 @@ namespace TestUI
 		{
 			List<IPAddress> ips = await P2PConnection.GetDNSSeedIPAddressesAsync(Globals.DNSSeedHosts);
 
+			Thread threadLable = new Thread(new ThreadStart(() =>
+			{
+			while (true)
+			{
+				Dispatcher.Invoke(()=>
+				{
+					label.Content = "Inbound: " + P2PConnectionManager.GetInboundP2PConnections().Count + " Outbound: " + P2PConnectionManager.GetOutboundP2PConnections().Count;
+				});
+					Thread.CurrentThread.Join(1000);
+			}
+			}));
+			threadLable.IsBackground = true;
+			threadLable.Start();
+
 			foreach (IPAddress ip in ips)
 			{
 				Thread connectThread = new Thread(new ThreadStart(() =>
 				{
 					P2PConnection p2p = new P2PConnection(ip, Globals.TCPMessageTimeout, new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp));
-					if (p2p.ConnectToPeer(((ulong)Globals.Services.NODE_NETWORK), 1, 1, true))
+					if (p2p.ConnectToPeer(((ulong)Globals.Services.NODE_NETWORK),1, (int)Globals.Relay.RELAY_ALWAYS))
 					{
-						P2PListener.AddP2PConnection(p2p);
+						P2PConnectionManager.AddP2PConnection(p2p);
 
 					}
 				}));

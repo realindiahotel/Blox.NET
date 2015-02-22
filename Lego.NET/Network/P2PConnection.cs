@@ -23,7 +23,8 @@ namespace Bitcoin.Lego.Network
 		private Thread _heartbeatThread;
 		private Thread _killDeadClientNoHeartbeatThread;
 		private Thread _addrFartThread;
-		private DateTime _lastRecievedMessage;
+		private Thread _randomGetAddrTimeThread;
+        private DateTime _lastRecievedMessage;
 
 		/// <summary>
 		/// New P2PConnection Object
@@ -40,7 +41,7 @@ namespace Bitcoin.Lego.Network
 			//fully loaded man https://www.youtube.com/watch?v=dLIIKrJ6nnI
 		}
 
-		public bool ConnectToPeer(ulong services, uint blockHeight, int relay, bool strictVerAck)
+		public bool ConnectToPeer(ulong services, uint blockHeight, int relay)
 		{
 			try
 			{
@@ -60,11 +61,11 @@ namespace Bitcoin.Lego.Network
 						//send my version message
 						Send(_myVersionMessage);
 
+						//not allowing strict verack on inbound as some don't respond with verack to their outbound connections
+
 						//send verack
 						if (pVerifyVersionMessage())
 						{
-							//it seems accepting the conection is sufficient as no one is sending me veracks on incoming connection so I won't check for verack
-
 							//send addr
 							_addrFartThread.Start();
 
@@ -95,13 +96,12 @@ namespace Bitcoin.Lego.Network
 						_theirVersionMessage = (VersionMessage)message;
 
 						//if strict verack is on we listen for verack and if we don't get it we close the connection
-						if (strictVerAck)
+						if (Globals.StrictVerackOutbound)
 						{
 							pCheckVerack();
 						}
 
-						//not sending verack as seems only a connection recipient acceptee does that
-						if (!pVerifyVersionMessage(false))
+						if (!pVerifyVersionMessage())
 						{
 							CloseConnection(true);
 						}
@@ -129,7 +129,7 @@ namespace Bitcoin.Lego.Network
 #else
 			catch (Exception ex)
 			{
-				Console.WriteLine("Exception: " + ex.Message);
+				Console.WriteLine("Exception Connect To Peer: " + ex.Message);
 				if (ex.InnerException != null)
 				{
 					Console.WriteLine("Inner Exception: " + ex.InnerException.Message);
@@ -248,30 +248,41 @@ namespace Bitcoin.Lego.Network
 							case "AddressMessage":
 								Thread _recieveAddressesThread = new Thread(new ThreadStart(() =>
 								{
-									DatabaseConnection dbC = new DatabaseConnection();
-									dbC.OpenDBConnection();
+									using (DatabaseConnection dbC = new DatabaseConnection())
+									{
+										dbC.OpenDBConnection();
 
-									foreach (PeerAddress pa in ((AddressMessage)message).Addresses)
-									{										
-										dbC.AddAddress(pa);
+										foreach (PeerAddress pa in ((AddressMessage)message).Addresses)
+										{
+											dbC.AddAddress(pa);
+										}
 									}
-
-									dbC.CloseDBConnection();
 								}));
 								_recieveAddressesThread.IsBackground = true;
 								_recieveAddressesThread.Start();
+							
 								break;
 
 							case "GetAddresses":
 								//to do spawn a new thread and handle dishing out addresses
-								PeerAddress _my_net_addr = Connection.GetMyExternalIP(_myVersionMessage.LocalServices);
+								PeerAddress _my_net_addr = GetMyExternalIP(_myVersionMessage.LocalServices);
 								Send(new AddressMessage(new List<PeerAddress>() { _my_net_addr }));
 								break;
 
 							case "NullMessage":
 								try
 								{
+									//error or strange message, close connection, if aggressive reconnect on we shall reconnect and start anew
 									this.CloseConnection(true);
+
+									if (Globals.AggressiveReconnect)
+									{
+										P2PConnection p2pc = new P2PConnection(this.RemoteIPAddress, Globals.TCPMessageTimeout, new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp), TheirVersionMessage.TheirAddr.Port);
+										if (p2pc.ConnectToPeer(MyVersionMessage.LocalServices, MyVersionMessage.StartBlockHeight, MyVersionMessage.Relay))
+										{
+											P2PConnectionManager.AddP2PConnection(p2pc);
+										}
+                                    }
 								}
 								catch
 								{
@@ -291,7 +302,7 @@ namespace Bitcoin.Lego.Network
 #else
 					catch (Exception ex)
 					{
-						Console.WriteLine("Exception: " + ex.Message);
+						Console.WriteLine("Exception Message Listener: " + ex.Message);
 						if (ex.InnerException != null)
 						{
 							Console.WriteLine("Inner Exception: " + ex.InnerException.Message);
@@ -331,21 +342,35 @@ namespace Bitcoin.Lego.Network
 
 			if (forget)
 			{
-				P2PListener.RemoveP2PConnection(this);
+				P2PConnectionManager.RemoveP2PConnection(this);
 			}
 		}
 
 		private void pSendAddrFart()
 		{
+			PeerAddress their_net_addr = new PeerAddress(RemoteIPAddress, RemotePort, TheirVersionMessage.LocalServices);
+			//make sure I put their address in the db if it's not in there
+			using (DatabaseConnection dBC = new DatabaseConnection())
+			{
+				dBC.AddAddress(their_net_addr);
+			}
+
 			while (Socket.Connected)
 			{
 				try
-				{		
-					PeerAddress _my_net_addr = Connection.GetMyExternalIP(_myVersionMessage.LocalServices);
-					Send(new AddressMessage(new List<PeerAddress>() {_my_net_addr }));
-					Thread randomGetAddrTimeThread = new Thread(new ThreadStart(pRandomTimeSendGetAddr));
-					randomGetAddrTimeThread.IsBackground = true;
-					randomGetAddrTimeThread.Start();
+				{	
+					//send my addr to the peer I've just connected too	
+					PeerAddress my_net_addr = GetMyExternalIP(_myVersionMessage.LocalServices);
+					Send(new AddressMessage(new List<PeerAddress>() {my_net_addr }));
+
+					//send the addr of the peer I have just connected too to all other peers					
+					BradcastSend(new AddressMessage(new List<PeerAddress>() { their_net_addr }),new List<P2PConnection>() { this });
+
+					
+
+					_randomGetAddrTimeThread = new Thread(new ThreadStart(pRandomTimeSendGetAddr));
+					_randomGetAddrTimeThread.IsBackground = true;
+					_randomGetAddrTimeThread.Start();
 					Thread.CurrentThread.Join(Globals.AddrFartInterval);
 				}
 #if (!DEBUG)
@@ -356,7 +381,7 @@ namespace Bitcoin.Lego.Network
 #else
 				catch (Exception ex)
 				{
-					Console.WriteLine("Exception: " + ex.Message);
+					Console.WriteLine("Exception Send My Addr Announce: " + ex.Message);
 					if (ex.InnerException != null)
 					{
 						Console.WriteLine("Inner Exception: " + ex.InnerException.Message);
@@ -368,9 +393,27 @@ namespace Bitcoin.Lego.Network
 
 		private void pRandomTimeSendGetAddr()
 		{
-			int sleep = new Random(DateTime.Now.Millisecond).Next(1, 20);
-			Thread.CurrentThread.Join(sleep * 30000);
-			Send(new GetAddresses());
+			try
+			{
+				int sleep = new Random(DateTime.Now.Millisecond).Next(1, 24);
+				Thread.CurrentThread.Join(sleep * 5000);
+				Send(new GetAddresses());
+			}
+#if (!DEBUG)
+			catch
+			{
+
+			}
+#else
+			catch (Exception ex)
+			{
+				Console.WriteLine("Exception Send Getaddr: " + ex.Message);
+				if (ex.InnerException != null)
+				{
+					Console.WriteLine("Inner Exception: " + ex.InnerException.Message);
+				}
+			}
+#endif
 		}
 
 		private void pSendHeartbeat()
@@ -394,7 +437,7 @@ namespace Bitcoin.Lego.Network
 #else
 				catch (Exception ex)
 				{
-					Console.WriteLine("Exception: " + ex.Message);
+					Console.WriteLine("Exception Send Heartbeat: " + ex.Message);
 					if (ex.InnerException != null)
 					{
 						Console.WriteLine("Inner Exception: " + ex.InnerException.Message);
@@ -413,7 +456,7 @@ namespace Bitcoin.Lego.Network
 				try
 				{
 					Thread.CurrentThread.Join(timeWait);
-
+					
 					if (Globals.DeadIfNoHeartbeat)
 					{
 						TimeSpan timeLapsed = DateTime.UtcNow - _lastRecievedMessage;
@@ -424,6 +467,9 @@ namespace Bitcoin.Lego.Network
 						{
 							//no heartbeat time to kill connection
 							CloseConnection(true);
+#if (DEBUG)
+							Console.WriteLine("Inactive Client Killed: "+RemoteIPAddress+ ":"+RemotePort);
+#endif
 						}
 
 						timeWait = (Globals.HeartbeatTimeout*3) - Convert.ToInt32(timeLapsed.TotalMilliseconds);
@@ -437,7 +483,7 @@ namespace Bitcoin.Lego.Network
 #else
 				catch (Exception ex)
 				{
-					Console.WriteLine("Exception: " + ex.Message);
+					Console.WriteLine("Exception No Heartbeat Kill: " + ex.Message);
 					if (ex.InnerException != null)
 					{
 						Console.WriteLine("Inner Exception: " + ex.InnerException.Message);
@@ -470,12 +516,12 @@ namespace Bitcoin.Lego.Network
 			}
 
 			//make sure I always have at least 100 seed nodes to check against
-			pGetHardcodedFillerIPs(ref ipAddressesOut);
+			pGetFillerIPs(ref ipAddressesOut);
 
 			return ipAddressesOut;
 		}
 
-		private static void pGetHardcodedFillerIPs(ref List<IPAddress> ipAddressesOut)
+		private static void pGetFillerIPs(ref List<IPAddress> ipAddressesOut)
 		{
 			Random notCryptoRandom = new Random(DateTime.Now.Millisecond);
 
@@ -508,8 +554,8 @@ namespace Bitcoin.Lego.Network
 				}
 			}
 
-			//make sure I always have at least 200 seed nodes to check against
-			pGetHardcodedFillerIPs(ref ipAddressesOut);
+			//make sure I always have at least 100 seed nodes to check against
+			pGetFillerIPs(ref ipAddressesOut);
 
 			return ipAddressesOut;
 		}
@@ -524,7 +570,7 @@ namespace Bitcoin.Lego.Network
 		{
 			Thread broadcastMessageThread = new Thread(new ThreadStart(() =>
 			{
-				foreach (P2PConnection p2p in P2PListener.GetP2PConnections())
+				foreach (P2PConnection p2p in P2PConnectionManager.GetAllP2PConnections())
 				{
 					if (!exclusions.Contains(p2p))
 					{
@@ -544,7 +590,7 @@ namespace Bitcoin.Lego.Network
 		{
 			Thread broadcastMessageThread = new Thread(new ThreadStart(() =>
 			{
-				foreach (P2PConnection p2p in P2PListener.GetP2PConnections())
+				foreach (P2PConnection p2p in P2PConnectionManager.GetAllP2PConnections())
 				{
 					p2p.Send(message);
 				}
@@ -574,7 +620,7 @@ namespace Bitcoin.Lego.Network
 #else
 					catch (Exception ex)
 					{
-						Console.WriteLine("Exception: " + ex.Message);
+						Console.WriteLine("Exception Send Message Attempt "+attempt+ ": "+ ex.Message);
 						if (ex.InnerException != null)
 						{
 							Console.WriteLine("Inner Exception: " + ex.InnerException.Message);
@@ -614,7 +660,7 @@ namespace Bitcoin.Lego.Network
 #else
 					catch (Exception ex)
 					{
-						Console.WriteLine("Recieve Message Exception Attempt " + attempt + ": " + ex.Message);
+						Console.WriteLine("Exception Recieve Message Attempt " + attempt + ": " + ex.Message);
 						if (ex.InnerException != null)
 						{
 							Console.WriteLine("Inner Exception: " + ex.InnerException.Message);
