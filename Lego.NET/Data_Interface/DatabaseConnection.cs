@@ -19,13 +19,13 @@ namespace Bitcoin.Lego.Data_Interface
 	/// </summary>
 	public class DatabaseConnection :IDisposable
 	{
+		//using LocalDB - can be swapped out for other SQL Server derivatives, including AzureDB. If using Azure, beware the rate limiting, keep an eye for resource exceed exceptions if using Azure DB
 		private String _connectionString = @"Data Source=(localdb)\MSSQLLocalDB;Initial Catalog=LegoDB;Integrated Security=True;Connect Timeout=60;Encrypt=False;TrustServerCertificate=False";
 		private SqlConnection _sqlConnectionObj;
 
 		public DatabaseConnection()
 		{
 			_sqlConnectionObj = new SqlConnection(_connectionString);
-			OpenDBConnection();
 		}
 
 		public bool CloseDBConnection()
@@ -131,15 +131,16 @@ namespace Bitcoin.Lego.Data_Interface
 					OpenDBConnection();
 				}
 
+				if (addressToAdd.IsExpired)
+				{
+					return false;
+				}
+
 				if (!IsAddressKnown(addressToAdd))
 				{
-					//saw some clients with weird big numbers un the service field, I don't trust them so they get treated as SPV nodes
-					if (addressToAdd.Services != (ulong)Globals.Services.NODE_NETWORK && addressToAdd.Services != (ulong)Globals.Services.SPV_NODE_NETWORK)
-					{
-						addressToAdd.Services=0;
-					}
+					pSanitiseServices(addressToAdd.Services);
 
-                    SqlCommand addAddrCmd = new SqlCommand("INSERT INTO [AddressPool] VALUES (@Param1, @Param2, @Param3, @Param4);", _sqlConnectionObj);
+					SqlCommand addAddrCmd = new SqlCommand("INSERT INTO [AddressPool] VALUES (@Param1, @Param2, @Param3, @Param4);", _sqlConnectionObj);
 					addAddrCmd.Parameters.Add(new SqlParameter("@Param1", addressToAdd.IPAddress.ToString()));
 					addAddrCmd.Parameters.Add(new SqlParameter("@Param2", Convert.ToInt32(addressToAdd.Time)));
 					addAddrCmd.Parameters.Add(new SqlParameter("@Param3", Convert.ToInt64(addressToAdd.Services)));
@@ -184,10 +185,12 @@ namespace Bitcoin.Lego.Data_Interface
 				}
 
 				uint currentTime = addressToCheck.Time;
+				int currentPort = addressToCheck.Port;
+				ulong currentServices = addressToCheck.Services;
 
 				if (GetAddress(addressToCheck.IPAddress.ToString(), ref addressToCheck))
 				{
-					if (currentTime > addressToCheck.Time)
+					if (currentTime > addressToCheck.Time || currentPort != addressToCheck.Port || currentServices != addressToCheck.Services)
 					{
 						//newer time update
 						UpdateAddressTime(addressToCheck, currentTime);
@@ -224,11 +227,16 @@ namespace Bitcoin.Lego.Data_Interface
 					OpenDBConnection();
 				}
 
-				using (SqlCommand updAddrCmd = new SqlCommand("UPDATE [AddressPool] SET [Time]=@Param1 WHERE [IPAddress]=@Param2;", _sqlConnectionObj))
+				//deal with weird services
+				pSanitiseServices(addressToUpdate.Services);				
+
+				using (SqlCommand updAddrCmd = new SqlCommand("UPDATE [AddressPool] SET [Time]=@Param1, [Services]=@Param2, [Port]=@Param3 WHERE [IPAddress]=@Param4;", _sqlConnectionObj))
 				{
 					updAddrCmd.CommandTimeout = 15000;
 					updAddrCmd.Parameters.Add(new SqlParameter("@Param1", Convert.ToInt32(time)));
-					updAddrCmd.Parameters.Add(new SqlParameter("@Param2", addressToUpdate.IPAddress.ToString()));
+					updAddrCmd.Parameters.Add(new SqlParameter("@Param2", Convert.ToInt64(addressToUpdate.Services)));
+					updAddrCmd.Parameters.Add(new SqlParameter("@Param3", Convert.ToInt32(addressToUpdate.Port)));
+					updAddrCmd.Parameters.Add(new SqlParameter("@Param4", addressToUpdate.IPAddress.ToString()));
 					if (updAddrCmd.ExecuteNonQuery() >= 1)
 					{
 						return true;
@@ -310,7 +318,7 @@ namespace Bitcoin.Lego.Data_Interface
 					OpenDBConnection();
 				}
 
-				using (SqlCommand getAddrCmd = new SqlCommand("SELECT TOP @Param1 FROM [AddressPool] ORDER BY [Time] DESC;", _sqlConnectionObj))
+				using (SqlCommand getAddrCmd = new SqlCommand("SELECT TOP (@Param1) * FROM AddressPool ORDER BY [Time] DESC;", _sqlConnectionObj))
 				{
 					getAddrCmd.Parameters.Add(new SqlParameter("@Param1", countx));
 
@@ -333,7 +341,7 @@ namespace Bitcoin.Lego.Data_Interface
 					return GetTopXAddresses(countx);
 				}
 #if (DEBUG)
-				Console.WriteLine("Exception Get Address DB: " + ex.Message);
+				Console.WriteLine("Exception Get Top X Address DB: " + ex.Message);
 				if (ex.InnerException != null)
 				{
 					Console.WriteLine("Inner Exception: " + ex.InnerException.Message);
@@ -342,6 +350,17 @@ namespace Bitcoin.Lego.Data_Interface
 			}
 
 			return addressesOut;
+		}
+
+		private ulong pSanitiseServices(ulong services)
+		{
+			//saw some clients with weird big numbers in the service field, I don't trust them so they get treated as SPV nodes.
+			if (services != (ulong)Globals.Services.NODE_NETWORK && services != (ulong)Globals.Services.SPV_NODE_NETWORK)
+			{
+				services = 0;
+			}
+
+			return services;
 		}
 
 		public String ConnectionString

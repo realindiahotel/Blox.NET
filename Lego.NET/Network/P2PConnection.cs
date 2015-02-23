@@ -23,8 +23,9 @@ namespace Bitcoin.Lego.Network
 		private Thread _heartbeatThread;
 		private Thread _killDeadClientNoHeartbeatThread;
 		private Thread _addrFartThread;
-		private Thread _randomGetAddrTimeThread;
         private DateTime _lastRecievedMessage;
+		private List<PeerAddress> _memAddressPool = new List<PeerAddress>();
+		private int _addressCursor = 0;
 
 		/// <summary>
 		/// New P2PConnection Object
@@ -136,7 +137,21 @@ namespace Bitcoin.Lego.Network
 				}
 			}
 #endif
+			try
+			{
+				if (Socket.Connected)
+				{
+					P2PConnectionManager.AddP2PConnection(this);
+					//calculate time offset and adjust accordingly
+					_peerTimeOffset = (long)(TheirVersionMessage.Time - Utilities.ToUnixTime(DateTime.UtcNow));
+					P2PConnectionManager.AddToNodeTimeOffset(_peerTimeOffset);
+				}
+			}
+			catch
+			{
 
+			}	
+			
 			return Socket.Connected;
 		}
 
@@ -240,33 +255,45 @@ namespace Bitcoin.Lego.Network
 								break;
 
 							case "RejectMessage":
-#if(DEBUG)						//if we run in debug I spew out to console, in production no to save from an attack that slows us down writing to the console
+#if (DEBUG)						//if we run in debug I spew out to console, in production no to save from an attack that slows us down writing to the console
 								Console.WriteLine(((RejectMessage)message).Message + " - " + ((RejectMessage)message).CCode + " - " + ((RejectMessage)message).Reason + " - " + ((RejectMessage)message).Data);
 #endif
 								break;
 
 							case "AddressMessage":
-								Thread _recieveAddressesThread = new Thread(new ThreadStart(() =>
+								Thread addrThread = new Thread(new ThreadStart(() =>
 								{
-									using (DatabaseConnection dbC = new DatabaseConnection())
-									{
-										dbC.OpenDBConnection();
-
-										foreach (PeerAddress pa in ((AddressMessage)message).Addresses)
-										{
-											dbC.AddAddress(pa);
-										}
-									}
+									AddToMemAddressPool(((AddressMessage)message).Addresses);
 								}));
-								_recieveAddressesThread.IsBackground = true;
-								_recieveAddressesThread.Start();
-							
+								addrThread.IsBackground = true;
+								addrThread.Start();
 								break;
 
 							case "GetAddresses":
-								//to do spawn a new thread and handle dishing out addresses
-								PeerAddress _my_net_addr = GetMyExternalIP(_myVersionMessage.LocalServices);
-								Send(new AddressMessage(new List<PeerAddress>() { _my_net_addr }));
+								Thread _getAddrThread = new Thread(new ThreadStart(() =>
+								{
+									PeerAddress _my_net_addr = GetMyExternalIP(_myVersionMessage.LocalServices);
+									List<PeerAddress> addrOne = new List<PeerAddress>() { _my_net_addr };
+									List<PeerAddress> addrTwo = new List<PeerAddress>();
+									List<PeerAddress> addrThree = new List<PeerAddress>();
+
+									//to do spawn a new thread and handle dishing out addresses
+									if (_memAddressPool.Count >= 2499)
+									{
+										addrOne.AddRange(_memAddressPool.GetRange(0, 999));
+										Send(new AddressMessage(addrOne));
+										addrTwo.AddRange(_memAddressPool.GetRange(999, 1000));
+										Send(new AddressMessage(addrTwo));
+										addrThree.AddRange(_memAddressPool.GetRange(1999, 500));
+										Send(new AddressMessage(addrThree));
+									}
+									else
+									{
+
+									}
+									
+									
+								}));
 								break;
 
 							case "NullMessage":
@@ -343,6 +370,7 @@ namespace Bitcoin.Lego.Network
 			if (forget)
 			{
 				P2PConnectionManager.RemoveP2PConnection(this);
+				P2PConnectionManager.SubtractFromNodeTimeOffset(_peerTimeOffset);
 			}
 		}
 
@@ -366,11 +394,6 @@ namespace Bitcoin.Lego.Network
 					//send the addr of the peer I have just connected too to all other peers					
 					BradcastSend(new AddressMessage(new List<PeerAddress>() { their_net_addr }),new List<P2PConnection>() { this });
 
-					
-
-					_randomGetAddrTimeThread = new Thread(new ThreadStart(pRandomTimeSendGetAddr));
-					_randomGetAddrTimeThread.IsBackground = true;
-					_randomGetAddrTimeThread.Start();
 					Thread.CurrentThread.Join(Globals.AddrFartInterval);
 				}
 #if (!DEBUG)
@@ -389,31 +412,6 @@ namespace Bitcoin.Lego.Network
 				}
 #endif
 			}
-		}
-
-		private void pRandomTimeSendGetAddr()
-		{
-			try
-			{
-				int sleep = new Random(DateTime.Now.Millisecond).Next(1, 24);
-				Thread.CurrentThread.Join(sleep * 5000);
-				Send(new GetAddresses());
-			}
-#if (!DEBUG)
-			catch
-			{
-
-			}
-#else
-			catch (Exception ex)
-			{
-				Console.WriteLine("Exception Send Getaddr: " + ex.Message);
-				if (ex.InnerException != null)
-				{
-					Console.WriteLine("Inner Exception: " + ex.InnerException.Message);
-				}
-			}
-#endif
 		}
 
 		private void pSendHeartbeat()
@@ -523,12 +521,32 @@ namespace Bitcoin.Lego.Network
 
 		private static void pGetFillerIPs(ref List<IPAddress> ipAddressesOut)
 		{
+			int weWantThisMany = 100;
 			Random notCryptoRandom = new Random(DateTime.Now.Millisecond);
+			int diff = (weWantThisMany - ipAddressesOut.Count);
 
-			for (int i = 0; i < (100 - ipAddressesOut.Count); i++)
+			//get newest addresses from database
+			if (diff > 0)
 			{
-				int rIndx = notCryptoRandom.Next(0, (HardSeedList.SeedIPStrings.Length - 1));
-				ipAddressesOut.Add(IPAddress.Parse(HardSeedList.SeedIPStrings[rIndx]));
+				using (DatabaseConnection dBC = new DatabaseConnection())
+				{
+					foreach (PeerAddress pa in dBC.GetTopXAddresses(diff))
+					{
+						ipAddressesOut.Add(pa.IPAddress);
+					}
+				}
+			}
+
+			diff = weWantThisMany - ipAddressesOut.Count;
+
+			//fallback on hardcoded seeds if need be
+			if (diff > 0)
+			{
+				for (int i = 0; i < diff; i++)
+				{
+					int rIndx = notCryptoRandom.Next(0, (HardSeedList.SeedIPStrings.Length - 1));
+					ipAddressesOut.Add(IPAddress.Parse(HardSeedList.SeedIPStrings[rIndx]));
+				}
 			}
 		}
 
@@ -672,6 +690,48 @@ namespace Bitcoin.Lego.Network
 			}
 			
 			return new NullMessage();
+		}
+
+		private void AddToMemAddressPool(IList<PeerAddress> addresses)
+		{
+			foreach(PeerAddress pa in addresses)
+            {
+				try
+				{
+					if (_addressCursor >= Globals.AddressMemPoolMax)
+					{
+						_addressCursor = 0;
+					}
+
+					if (!pa.IsExpired)
+					{
+						if (_memAddressPool.Count < Globals.AddressMemPoolMax)
+						{
+							_memAddressPool.Add(pa);
+						}
+						else
+						{
+							_memAddressPool[_addressCursor] = pa;
+							_addressCursor++;
+						}
+					}
+				}
+#if (!DEBUG)
+				catch
+				{
+
+				}
+#else
+				catch (Exception ex)
+				{
+					Console.WriteLine("Exception Add Addr To Mem Pool: "+ ex.Message);
+					if (ex.InnerException != null)
+					{
+						Console.WriteLine("Inner Exception: " + ex.InnerException.Message);
+					}
+				}
+#endif
+			}
 		}
 
 		public VersionMessage MyVersionMessage

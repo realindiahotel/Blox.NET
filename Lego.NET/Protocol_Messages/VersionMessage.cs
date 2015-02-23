@@ -7,6 +7,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.IO;
 using Bitcoin.BitcoinUtilities;
+using Bitcoin.Lego.Network;
 
 namespace Bitcoin.Lego.Protocol_Messages
 {
@@ -22,6 +23,7 @@ namespace Bitcoin.Lego.Protocol_Messages
 		private string _userAgent;
 		private uint _startBlockHeight;
 		private int _relay;
+
 
 
 			/// <summary>
@@ -124,7 +126,7 @@ namespace Bitcoin.Lego.Protocol_Messages
 		public VersionMessage(IPAddress remoteIpAddress, Socket sock, ulong services, int remotePort, uint newBestHeight, int relay, uint packetMagic = Globals.ProdPacketMagic) :base(packetMagic)
 		{
 			_localServices = services;
-			_time = Utilities.ToUnixTime(DateTime.UtcNow);
+			_time = P2PConnectionManager.GetUTCNowWithOffset();
 			_myAddr = new PeerAddress(IPAddress.Loopback, ((IPEndPoint)sock.LocalEndPoint).Port, services,Globals.ClientVersion,true);
 			_theirAddr = new PeerAddress(remoteIpAddress, remotePort, services, Globals.ClientVersion,true);
 			_nonce = Globals.NotCryptoRandomNonce;

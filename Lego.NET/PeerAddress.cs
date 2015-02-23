@@ -8,6 +8,7 @@ using System.IO;
 using Bitcoin.BitcoinUtilities;
 using Org.BouncyCastle.Math;
 using Bitcoin.Lego.Protocol_Messages;
+using Bitcoin.Lego.Network;
 
 namespace Bitcoin.Lego
 {
@@ -40,7 +41,7 @@ namespace Bitcoin.Lego
 		{
 			_addr = addr;
 			_port = port;
-			_time = ((uint)Utilities.ToUnixTime(DateTime.UtcNow));
+			_time = (uint)P2PConnectionManager.GetUTCNowWithOffset();			
 			ProtocolVersion = protocolVersion;
 			_services = services;
 			_isInVersionMessage = isInVersionMessage;
@@ -94,7 +95,7 @@ namespace Bitcoin.Lego
 			}
 			else
 			{
-				_time = Convert.ToUInt32(Utilities.ToUnixTime(DateTime.UtcNow));
+				_time = (uint)P2PConnectionManager.GetUTCNowWithOffset();				
 			}
 			_services = ReadUint64();
 			var addrBytes = ReadBytes(16);
@@ -108,6 +109,20 @@ namespace Bitcoin.Lego
 			_port = (Bytes[Cursor++] << 8) | Bytes[Cursor++];
 
 			Bytes = null;
+		}
+
+		public bool IsExpired
+		{
+			get
+			{
+				//if older than 3 hours
+				if (_time <= (((uint)Utilities.ToUnixTime(DateTime.UtcNow)) - 10800))
+                {
+					return true;
+				}
+
+				return false;
+			}
 		}
 
 		public override string ToString()

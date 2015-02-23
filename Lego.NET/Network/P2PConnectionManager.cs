@@ -19,6 +19,7 @@ namespace Bitcoin.Lego.Network
 		private static Thread _listenThread;
 		private static List<P2PConnection> _p2pInboundConnections = new List<P2PConnection>();
 		private static List<P2PConnection> _p2pOutboundConnections = new List<P2PConnection>();
+		private static long _nodeNetworkOffset = 0;
 
 		public static bool ListenForIncomingP2PConnections(IPAddress ipInterfaceToBind, int portToBind = Globals.LocalP2PListeningPort)
 		{
@@ -173,5 +174,47 @@ namespace Bitcoin.Lego.Network
 			poolConnections.AddRange(_p2pInboundConnections);
 			return poolConnections;
 		}
+
+		public static bool ConnectedToPeer(PeerAddress peer)
+		{
+			foreach (P2PConnection pc in GetAllP2PConnections())
+			{
+				if (pc.RemoteIPAddress.ToString().Contains(peer.IPAddress.ToString()))
+                {
+					return true;
+				}
+			}
+
+			return false;
+		}
+
+		public static void AddToNodeTimeOffset(long add)
+		{
+			_nodeNetworkOffset += add;
+		}
+
+		public static void SubtractFromNodeTimeOffset(long subtract)
+		{
+			_nodeNetworkOffset -= subtract;
+		}
+
+		public static long NodeTimeOffset
+		{
+			get
+			{
+				return _nodeNetworkOffset;
+			}
+		}
+
+		public static ulong GetUTCNowWithOffset()
+		{
+			int peerCount = P2PConnectionManager.GetAllP2PConnections().Count;
+			if (peerCount > 0) //protect from divide by zero
+			{
+				return Utilities.ToUnixTime(DateTime.UtcNow) + ((ulong)(P2PConnectionManager.NodeTimeOffset / P2PConnectionManager.GetAllP2PConnections().Count));
+			}
+
+			return Utilities.ToUnixTime(DateTime.UtcNow);
+        }
 	}
 }
