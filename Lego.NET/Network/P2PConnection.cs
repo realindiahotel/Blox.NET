@@ -270,30 +270,72 @@ namespace Bitcoin.Lego.Network
 								break;
 
 							case "GetAddresses":
-								Thread _getAddrThread = new Thread(new ThreadStart(() =>
+								Thread getAddrThread = new Thread(new ThreadStart(() =>
 								{
-									PeerAddress _my_net_addr = GetMyExternalIP(_myVersionMessage.LocalServices);
-									List<PeerAddress> addrOne = new List<PeerAddress>() { _my_net_addr };
+									PeerAddress my_net_addr = GetMyExternalIP(_myVersionMessage.LocalServices);
+									List<PeerAddress> addrOne = new List<PeerAddress>() { my_net_addr };
 									List<PeerAddress> addrTwo = new List<PeerAddress>();
 									List<PeerAddress> addrThree = new List<PeerAddress>();
+									int maxAddresses = 2500;
 
 									//to do spawn a new thread and handle dishing out addresses
-									if (_memAddressPool.Count >= 2499)
+									if (_memAddressPool.Count >= (maxAddresses-1))
 									{
 										addrOne.AddRange(_memAddressPool.GetRange(0, 999));
-										Send(new AddressMessage(addrOne));
 										addrTwo.AddRange(_memAddressPool.GetRange(999, 1000));
-										Send(new AddressMessage(addrTwo));
 										addrThree.AddRange(_memAddressPool.GetRange(1999, 500));
-										Send(new AddressMessage(addrThree));
 									}
 									else
 									{
+										int diff = (maxAddresses - _memAddressPool.Count);
 
-									}
-									
-									
+										int idx = 0;
+										while (idx < _memAddressPool.Count)
+										{
+											if (idx < 999)
+											{
+												addrOne.Add(_memAddressPool[idx]);
+											}
+											else if (idx < 1999)
+											{
+												addrTwo.Add(_memAddressPool[idx]);
+											}
+											else if(idx <2499)
+											{
+												addrThree.Add(_memAddressPool[idx]);
+											}
+
+											idx++;
+										}
+
+										using (DatabaseConnection dBC = new DatabaseConnection())
+										{
+											foreach(PeerAddress pa in dBC.GetTopXAddresses(diff))
+                                            {
+												if (idx < 999)
+												{
+													addrOne.Add(pa);
+												}
+												else if (idx < 1999)
+												{
+													addrTwo.Add(pa);
+												}
+												else if (idx < 2499)
+												{
+													addrThree.Add(pa);
+												}
+
+												idx++;
+											}
+                                        }
+
+										Send(new AddressMessage(addrOne));
+										Send(new AddressMessage(addrTwo));
+										Send(new AddressMessage(addrThree));
+									}														
 								}));
+								getAddrThread.IsBackground = true;
+								getAddrThread.Start();
 								break;
 
 							case "NullMessage":

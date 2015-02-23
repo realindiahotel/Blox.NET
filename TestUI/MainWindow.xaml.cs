@@ -67,7 +67,7 @@ namespace TestUI
 
 		private void button1_Click(object sender, RoutedEventArgs e)
 		{
-			P2PConnectionManager.ListenForIncomingP2PConnections(IPAddress.Any);
+			P2PConnectionManager.ListenForIncomingP2PConnections(IPAddress.Any,42291);
 		}
 
 		private void button2_Click(object sender, RoutedEventArgs e)

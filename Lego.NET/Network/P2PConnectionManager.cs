@@ -171,7 +171,10 @@ namespace Bitcoin.Lego.Network
 		public static List<P2PConnection> GetAllP2PConnections()
 		{
 			List<P2PConnection> poolConnections = new List<P2PConnection>(_p2pOutboundConnections);
-			poolConnections.AddRange(_p2pInboundConnections);
+			if (_p2pInboundConnections.Count > 0)
+			{
+				poolConnections.AddRange(_p2pInboundConnections);
+			}
 			return poolConnections;
 		}
 
