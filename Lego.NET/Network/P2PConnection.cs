@@ -430,7 +430,7 @@ namespace Bitcoin.Lego.Network
 				try
 				{	
 					//send my addr to the peer I've just connected too	
-					PeerAddress my_net_addr = GetMyExternalIP(_myVersionMessage.LocalServices);
+					PeerAddress my_net_addr = GetMyExternalIP(_myVersionMessage.LocalServices,Globals.LocalP2PListeningPort);
 					Send(new AddressMessage(new List<PeerAddress>() {my_net_addr }));
 
 					//send the addr of the peer I have just connected too to all other peers					
