@@ -16,6 +16,7 @@
         <Button x:Name="button6" Content="Get External IP" HorizontalAlignment="Left" Margin="330,137,0,0" VerticalAlignment="Top" Width="93" Click="button6_Click"/>
         <Button x:Name="button7" Content="Show DB Connection String" HorizontalAlignment="Left" Margin="218,275,0,0" VerticalAlignment="Top" Width="187" Click="button7_Click"/>
         <Label x:Name="label" Content="Label" HorizontalAlignment="Left" Margin="182,21,0,0" VerticalAlignment="Top"/>
+        <Button x:Name="button8" Content="Port Forward UPnP" HorizontalAlignment="Left" Margin="330,184,0,0" VerticalAlignment="Top" Width="116" Click="button8_Click"/>
 
     </Grid>
 </Window>

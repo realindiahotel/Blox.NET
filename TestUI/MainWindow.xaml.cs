@@ -65,9 +65,9 @@ namespace TestUI
 			threadLable.Start();
 		}
 
-		private void button1_Click(object sender, RoutedEventArgs e)
+		private async void button1_Click(object sender, RoutedEventArgs e)
 		{
-			P2PConnectionManager.ListenForIncomingP2PConnections(IPAddress.Any,42291);
+			await P2PConnectionManager.ListenForIncomingP2PConnectionsAsync(IPAddress.Any,Globals.LocalP2PListeningPort);
 		}
 
 		private void button2_Click(object sender, RoutedEventArgs e)
@@ -127,6 +127,11 @@ namespace TestUI
 		private void button7_Click(object sender, RoutedEventArgs e)
 		{
 			MessageBox.Show(new DatabaseConnection().ConnectionString);
+		}
+
+		private async void button8_Click(object sender, RoutedEventArgs e)
+		{
+			await Connection.SetNATPortForwardingUPnPAsync(Globals.LocalP2PListeningPort, Globals.LocalP2PListeningPort);
 		}
 	}
 }

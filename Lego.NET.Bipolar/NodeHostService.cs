@@ -28,9 +28,9 @@ namespace Lego.NET.Bipolar
 		{
 		}
 
-		public void StarteMe()
+		public async void StarteMe()
 		{
-			P2PConnectionManager.ListenForIncomingP2PConnections(IPAddress.Any);
+			await P2PConnectionManager.ListenForIncomingP2PConnectionsAsync(IPAddress.Any);
 		}
 	}
 }

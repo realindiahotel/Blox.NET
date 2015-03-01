@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.IO;
 using System.Net;
@@ -9,6 +10,7 @@ using System.Net.Sockets;
 using Bitcoin.BitcoinUtilities;
 using Bitcoin.Lego.Protocol_Messages;
 using HtmlAgilityPack;
+using Open.Nat;
 
 namespace Bitcoin.Lego.Network
 {
@@ -179,7 +181,44 @@ namespace Bitcoin.Lego.Network
 			return new PeerAddress(IPAddress.Parse("127.0.0.1"), port, services, Globals.ClientVersion, false);
 
 			//'Live Wire' - https://soundcloud.com/excision/live-wire
-		}	
+		}
+
+		public static async Task<bool> SetNATPortForwardingUPnPAsync(int externalPort, int internalPort)
+		{
+			try
+			{
+				var nat = new NatDiscoverer();
+				var cts = new CancellationTokenSource(5000);
+				var device = await nat.DiscoverDeviceAsync(PortMapper.Upnp, cts);
+
+				//purge any old port mapping 
+				await device.DeletePortMapAsync(new Mapping(Protocol.Tcp, internalPort,externalPort));
+
+				//now we create the port mapping
+				await device.CreatePortMapAsync(new Mapping(Protocol.Tcp, internalPort, externalPort, 0, "Lego.NET Bitcoin Node Port Forward Rule"));
+
+				return true;
+
+			}
+#if (!DEBUG)
+			catch
+			{
+				return false;
+			}
+#else
+			catch (Exception ex)
+			{
+				Console.WriteLine("Exception UPnP Port Forwarding: " + ex.Message);
+				if (ex.InnerException != null)
+				{
+					Console.WriteLine("Inner Exception: " + ex.InnerException.Message);
+				}
+
+				return false;
+			}
+#endif
+
+		}
 
 		internal BitcoinSerializer Serializer
 		{

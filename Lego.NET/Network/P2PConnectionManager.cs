@@ -21,7 +21,7 @@ namespace Bitcoin.Lego.Network
 		private static List<P2PConnection> _p2pOutboundConnections = new List<P2PConnection>();
 		private static long _nodeNetworkOffset = 0;
 
-		public static bool ListenForIncomingP2PConnections(IPAddress ipInterfaceToBind, int portToBind = Globals.LocalP2PListeningPort)
+		public static async Task<bool> ListenForIncomingP2PConnectionsAsync(IPAddress ipInterfaceToBind, int portToBind = Globals.LocalP2PListeningPort)
 		{
 			if (!_listening)
 			{
@@ -38,6 +38,10 @@ namespace Bitcoin.Lego.Network
 					}
 					_socket.Bind(_localEndPoint);
 					_socket.Listen(1000);
+
+					//try upnp port forward mapping
+					await Connection.SetNATPortForwardingUPnPAsync(Globals.LocalP2PListeningPort, Globals.LocalP2PListeningPort);
+				
 					_listenThread = new Thread(new ThreadStart(() =>
 					{
 						while (_listening)
