@@ -536,6 +536,9 @@ namespace Bitcoin.Lego.Network
 						Thread.CurrentThread.Join(getaddrDelay);
 						Send(new GetAddresses());
 						Thread.CurrentThread.Join((Globals.AddrFartInterval - getaddrDelay));
+#if (DEBUG)
+						Console.WriteLine("Send Addr Wakes Up");
+#endif
 					}
 				}
 #if (!DEBUG)
@@ -567,7 +570,18 @@ namespace Bitcoin.Lego.Network
 					if (Globals.HeartbeatKeepAlive)
 					{
 						Send(new Ping());
+
+#if (DEBUG)
+						Console.WriteLine("Send Heartbeat Ping");
+#endif
 					}
+
+#if (DEBUG)
+					else
+					{
+						Console.WriteLine("Heartbeat Send Is Off");
+					}
+#endif
 				}
 #if (!DEBUG)
 				catch
@@ -596,24 +610,31 @@ namespace Bitcoin.Lego.Network
 				try
 				{
 					Thread.CurrentThread.Join(timeWait);
-					
+
 					if (Globals.DeadIfNoHeartbeat)
 					{
 						TimeSpan timeLapsed = DateTime.UtcNow - _lastRecievedMessage;
 
-						TimeSpan timeOut = new TimeSpan(timeWait*10000);
+						TimeSpan timeOut = new TimeSpan(timeWait * 10000);
 
 						if (timeLapsed > timeOut)
 						{
 							//no heartbeat time to kill connection
 							CloseConnection(true);
 #if (DEBUG)
-							Console.WriteLine("Inactive Client Killed: "+RemoteIPAddress+ ":"+RemotePort);
+							Console.WriteLine("Inactive Client Killed: " + RemoteIPAddress + ":" + RemotePort);
 #endif
 						}
 
-						timeWait = (Globals.HeartbeatTimeout*3) - Convert.ToInt32(timeLapsed.TotalMilliseconds);
+						timeWait = (Globals.HeartbeatTimeout * 3) - Convert.ToInt32(timeLapsed.TotalMilliseconds);
 					}
+#if (DEBUG)
+					else
+					{
+						Console.WriteLine("Dead If No Heartbeat Off");
+
+					}
+#endif
 				}
 #if (!DEBUG)
 				catch
