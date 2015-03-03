@@ -45,6 +45,7 @@ namespace TestUI
 				{
 					MessageBox.Show("Not connected");
 				}
+				
 			}));
 
 			connectThread.IsBackground = true;
@@ -67,6 +68,27 @@ namespace TestUI
 
 		private async void button1_Click(object sender, RoutedEventArgs e)
 		{
+			Thread threadLable = new Thread(new ThreadStart(() =>
+			{
+				while (true)
+				{
+					Dispatcher.Invoke(() =>
+					{
+						List<P2PConnection> inNodes = P2PConnectionManager.GetInboundP2PConnections();
+                        label.Content = "Inbound: " + inNodes.Count + " Outbound: " + P2PConnectionManager.GetOutboundP2PConnections().Count;
+
+						if (inNodes.Count > 0)
+						{
+
+						}
+					});
+
+                    Thread.CurrentThread.Join(1000);
+				}
+			}));
+			threadLable.IsBackground = true;
+			threadLable.Start();
+
 			await P2PConnectionManager.ListenForIncomingP2PConnectionsAsync(IPAddress.Any,Globals.LocalP2PListeningPort);
 		}
 
@@ -82,14 +104,14 @@ namespace TestUI
 
 		private async void button4_Click(object sender, RoutedEventArgs e)
 		{
-			List<IPAddress> ips = await P2PConnection.GetDNSSeedIPAddressesAsync(Globals.DNSSeedHosts);
+			List<PeerAddress> ips = await P2PConnection.GetDNSSeedIPAddressesAsync(Globals.DNSSeedHosts);
 			MessageBox.Show(ips.Count.ToString());
 
 		}
 
 		private async void button5_Click(object sender, RoutedEventArgs e)
 		{
-			List<IPAddress> ips = await P2PConnection.GetDNSSeedIPAddressesAsync(Globals.DNSSeedHosts);
+			List<PeerAddress> ips = await P2PConnection.GetDNSSeedIPAddressesAsync(Globals.DNSSeedHosts);
 
 			Thread threadLable = new Thread(new ThreadStart(() =>
 			{
@@ -105,11 +127,11 @@ namespace TestUI
 			threadLable.IsBackground = true;
 			threadLable.Start();
 
-			foreach (IPAddress ip in ips)
+			foreach (PeerAddress ip in ips)
 			{
 				Thread connectThread = new Thread(new ThreadStart(() =>
 				{
-					P2PConnection p2p = new P2PConnection(ip, Globals.TCPMessageTimeout, new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp));
+					P2PConnection p2p = new P2PConnection(ip.IPAddress, Globals.TCPMessageTimeout, new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp),ip.Port);
 					p2p.ConnectToPeer(((ulong)Globals.Services.NODE_NETWORK), 1, (int)Globals.Relay.RELAY_ALWAYS);
 					
 				}));

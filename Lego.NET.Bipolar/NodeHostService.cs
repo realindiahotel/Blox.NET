@@ -8,6 +8,7 @@ using System.ServiceProcess;
 using System.Text;
 using System.Threading.Tasks;
 using Bitcoin.Lego.Network;
+using Bitcoin.BitcoinUtilities;
 using System.Net;
 
 namespace Lego.NET.Bipolar
@@ -30,7 +31,10 @@ namespace Lego.NET.Bipolar
 
 		public async void StarteMe()
 		{
-			await P2PConnectionManager.ListenForIncomingP2PConnectionsAsync(IPAddress.Any);
+			if (Globals.EnableListenForPeers)
+			{
+				await P2PConnectionManager.ListenForIncomingP2PConnectionsAsync(IPAddress.Any);
+			}
 		}
 	}
 }

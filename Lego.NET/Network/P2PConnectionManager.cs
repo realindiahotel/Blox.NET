@@ -39,8 +39,11 @@ namespace Bitcoin.Lego.Network
 					_socket.Bind(_localEndPoint);
 					_socket.Listen(1000);
 
-					//try upnp port forward mapping
-					await Connection.SetNATPortForwardingUPnPAsync(Globals.LocalP2PListeningPort, Globals.LocalP2PListeningPort);
+					if (Globals.UPNPMapPort)
+					{
+						//try upnp port forward mapping
+						await Connection.SetNATPortForwardingUPnPAsync(Globals.LocalP2PListeningPort, Globals.LocalP2PListeningPort);
+					}
 				
 					_listenThread = new Thread(new ThreadStart(() =>
 					{
@@ -49,13 +52,11 @@ namespace Bitcoin.Lego.Network
 							try
 							{
 								Socket newConnectedPeerSock = _socket.Accept();
+
 								//we've accepted a new peer create a new P2PConnection object to deal with them and we need to be sure to mark it as incoming so it gets stored appropriately
 								P2PConnection p2pconnecting = new P2PConnection(((IPEndPoint)newConnectedPeerSock.RemoteEndPoint).Address, Globals.TCPMessageTimeout, newConnectedPeerSock, ((IPEndPoint)newConnectedPeerSock.RemoteEndPoint).Port, true);
-
-								if (p2pconnecting.ConnectToPeer((ulong)Globals.Services.NODE_NETWORK, 1,(int)Globals.Relay.RELAY_ALWAYS))
-								{
-									AddP2PConnection(p2pconnecting);
-								}
+							
+								p2pconnecting.ConnectToPeer((ulong)Globals.Services.NODE_NETWORK, 1, (int)Globals.Relay.RELAY_ALWAYS);
                             }
 							catch(SocketException sex)
 							{
@@ -122,6 +123,11 @@ namespace Bitcoin.Lego.Network
 			return true;
 		}
 
+		public static async void ConnectToPeers(List<IPAddress> peers)
+		{
+			//List<IPAddress> ips = await P2PConnection.GetDNSSeedIPAddressesAsync(Globals.DNSSeedHosts);
+		}
+
 		public static void AddP2PConnection(P2PConnection p2pConnection)
 		{
 			if (p2pConnection.InboundConnection)
@@ -139,11 +145,29 @@ namespace Bitcoin.Lego.Network
 			{
 				if (p2pConnection.InboundConnection)
 				{
-					_p2pInboundConnections.Remove(p2pConnection);
+					//is inbound
+					List<P2PConnection> toRemove = _p2pInboundConnections.FindAll(delegate (P2PConnection p2p)
+					{
+						return p2p.RemoteIPAddress.Equals(p2pConnection.RemoteIPAddress) && p2p.RemotePort.Equals(p2pConnection.RemotePort);
+					});
+
+					foreach (P2PConnection p2 in toRemove)
+					{
+						_p2pInboundConnections.Remove(p2pConnection);
+					}
 					return;
 				}
 
-				_p2pOutboundConnections.Remove(p2pConnection);
+				//is outbound 
+				List<P2PConnection> toRemoveOut = _p2pInboundConnections.FindAll(delegate (P2PConnection p2p)
+				{
+					return p2p.RemoteIPAddress.Equals(p2pConnection.RemoteIPAddress) && p2p.RemotePort.Equals(p2pConnection.RemotePort);
+				});
+
+				foreach (P2PConnection p2 in toRemoveOut)
+				{
+					_p2pOutboundConnections.Remove(p2pConnection);
+				}				
 			}
 #if (!DEBUG)
 			catch
