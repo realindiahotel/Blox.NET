@@ -22,3 +22,5 @@ Current Achieved Milestones (Protocol version 70002):
 * Check if remote client timestamp <> 70 minutes and dissallow
 * Check nonce and dissallow connection to self (optional)
 * Get external IP
+* UPnP Port Forward attempt
+* Connected node average time offset
