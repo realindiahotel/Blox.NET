@@ -72,6 +72,24 @@ namespace Bitcoin.Lego.Network
 				{
 					try
 					{
+						page = await webCli.DownloadStringTaskAsync(new Uri("http://ipconfig.io", UriKind.Absolute));
+						page = page.Trim();
+
+						if (!page.Equals(""))
+						{
+							if ((page.Split(new char[] { '.' }).Length == 4) || (page.Split(new char[] { ':' }).Length == 8))
+							{
+								return new PeerAddress(IPAddress.Parse(page), port, services, Globals.ClientVersion, false);
+							}
+						}
+					}
+					catch
+					{
+						//allows falling through to next http request
+					}
+
+					try
+					{
 						page = await webCli.DownloadStringTaskAsync(new Uri("http://checkip.dyndns.org", UriKind.Absolute));
 						if (!page.Equals(""))
 						{
@@ -130,6 +148,24 @@ namespace Bitcoin.Lego.Network
 
 				using (WebClient webCli = new WebClient())
 				{
+					try
+					{
+						page = webCli.DownloadString(new Uri("http://ipconfig.io", UriKind.Absolute));
+						page = page.Trim();
+
+						if (!page.Equals(""))
+						{
+							if ((page.Split(new char[] { '.' }).Length == 4) || (page.Split(new char[] { ':' }).Length == 8))
+							{
+								return new PeerAddress(IPAddress.Parse(page), port, services, Globals.ClientVersion, false);
+							}
+						}
+					}
+					catch
+					{
+						//allows falling through to next http request
+					}
+
 					try
 					{
 						page = webCli.DownloadString(new Uri("http://checkip.dyndns.org", UriKind.Absolute));

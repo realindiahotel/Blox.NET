@@ -111,13 +111,33 @@ namespace Bitcoin.Lego
 			Bytes = null;
 		}
 
-		public bool IsExpired
+		/// <summary>
+		/// Used to determine if we relay this address or not
+		/// </summary>
+		public bool IsRelayExpired
 		{
 			get
 			{
 				//if older than 3 hours
-				if (_time <= (((uint)Utilities.ToUnixTime(DateTime.UtcNow)) - 10800))
+				if (_time <= (((uint)P2PConnectionManager.GetUTCNowWithOffset()) - 10800))
                 {
+					return true;
+				}
+
+				return false;
+			}
+		}
+
+		/// <summary>
+		/// If it is older than 24 hours we don't include in getaddr responses
+		/// </summary>
+		public bool Is24hrExpired
+		{
+			get
+			{
+				//if older than 3 hours
+				if (_time <= (((uint)P2PConnectionManager.GetUTCNowWithOffset()) - 86400))
+				{
 					return true;
 				}
 

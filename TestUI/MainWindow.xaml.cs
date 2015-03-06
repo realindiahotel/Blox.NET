@@ -29,7 +29,8 @@ namespace TestUI
 	public partial class MainWindow : Window
 	{
 		P2PConnection p2p;
-        public MainWindow()
+
+		public MainWindow()
 		{
 			InitializeComponent();
 		}
@@ -59,7 +60,7 @@ namespace TestUI
 					{
 						label.Content = "Inbound: " + P2PConnectionManager.GetInboundP2PConnections().Count + " Outbound: " + P2PConnectionManager.GetOutboundP2PConnections().Count;
 					});
-					Thread.CurrentThread.Join(1000);
+					Thread.CurrentThread.Join(250);
 				}
 			}));
 			threadLable.IsBackground = true;
@@ -104,14 +105,14 @@ namespace TestUI
 
 		private async void button4_Click(object sender, RoutedEventArgs e)
 		{
-			List<PeerAddress> ips = await P2PConnection.GetDNSSeedIPAddressesAsync(Globals.DNSSeedHosts);
+			List<PeerAddress> ips = await P2PConnectionManager.GetDNSSeedIPAddressesAsync(Globals.DNSSeedHosts);
 			MessageBox.Show(ips.Count.ToString());
 
 		}
 
 		private async void button5_Click(object sender, RoutedEventArgs e)
 		{
-			List<PeerAddress> ips = await P2PConnection.GetDNSSeedIPAddressesAsync(Globals.DNSSeedHosts);
+			List<PeerAddress> ips = await P2PConnectionManager.GetDNSSeedIPAddressesAsync(Globals.DNSSeedHosts);
 
 			Thread threadLable = new Thread(new ThreadStart(() =>
 			{

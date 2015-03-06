@@ -8,6 +8,7 @@ using System.Net.Sockets;
 using System.IO;
 using Bitcoin.BitcoinUtilities;
 using System.Threading;
+using Bitcoin.Lego.Data_Interface;
 
 namespace Bitcoin.Lego.Network
 {
@@ -146,28 +147,19 @@ namespace Bitcoin.Lego.Network
 				if (p2pConnection.InboundConnection)
 				{
 					//is inbound
-					List<P2PConnection> toRemove = _p2pInboundConnections.FindAll(delegate (P2PConnection p2p)
+					_p2pInboundConnections.RemoveAll(delegate (P2PConnection p2p)
 					{
 						return p2p.RemoteIPAddress.Equals(p2pConnection.RemoteIPAddress) && p2p.RemotePort.Equals(p2pConnection.RemotePort);
 					});
 
-					foreach (P2PConnection p2 in toRemove)
-					{
-						_p2pInboundConnections.Remove(p2pConnection);
-					}
 					return;
 				}
 
 				//is outbound 
-				List<P2PConnection> toRemoveOut = _p2pInboundConnections.FindAll(delegate (P2PConnection p2p)
+				_p2pOutboundConnections.RemoveAll(delegate (P2PConnection p2p)
 				{
 					return p2p.RemoteIPAddress.Equals(p2pConnection.RemoteIPAddress) && p2p.RemotePort.Equals(p2pConnection.RemotePort);
-				});
-
-				foreach (P2PConnection p2 in toRemoveOut)
-				{
-					_p2pOutboundConnections.Remove(p2pConnection);
-				}				
+				});	
 			}
 #if (!DEBUG)
 			catch
@@ -208,15 +200,161 @@ namespace Bitcoin.Lego.Network
 
 		public static bool ConnectedToPeer(PeerAddress peer)
 		{
-			foreach (P2PConnection pc in GetAllP2PConnections())
+			List<P2PConnection> exists = GetAllP2PConnections().FindAll(delegate (P2PConnection pc)
 			{
-				if (pc.RemoteIPAddress.ToString().Contains(peer.IPAddress.ToString()))
-                {
-					return true;
-				}
+				return pc.RemoteIPAddress.ToString().Equals(peer.IPAddress.ToString()) && pc.RemotePort.Equals(peer.Port);
+            });
+
+			if (exists.Count > 0)
+			{
+				return true;
 			}
 
 			return false;
+		}
+
+		public static async Task<List<PeerAddress>> GetDNSSeedIPAddressesAsync(String[] DNSHosts)
+		{
+			List<IPAddress[]> dnsServerIPArrays = new List<IPAddress[]>();
+			List<PeerAddress> ipAddressesOut = new List<PeerAddress>();
+
+			pGetDatabaseIPs(ref ipAddressesOut);
+
+			//couldn't get enough seeds from the db so get from dns
+			if (ipAddressesOut.Count < Globals.SeedNodeCount)
+			{
+				try
+				{
+
+					foreach (String host in DNSHosts)
+					{
+						try
+						{
+							IPAddress[] addrs = await Dns.GetHostAddressesAsync(host);
+							dnsServerIPArrays.Add(addrs);
+						}
+						catch
+						{
+							//allows for continuation if any dns server goes down
+						}
+					}
+
+					foreach (IPAddress[] iparr in dnsServerIPArrays)
+					{
+						foreach (IPAddress ip in iparr)
+						{
+							if (ipAddressesOut.Count >= Globals.SeedNodeCount)
+							{
+								//we have enough break the loop
+								break;
+							}
+
+							PeerAddress pa = new PeerAddress(ip, Globals.ProdP2PPort, (ulong)Globals.Services.NODE_NETWORK);
+
+							if (!ipAddressesOut.Contains(pa))
+							{
+								ipAddressesOut.Add(pa);
+							}
+						}
+					}
+				}
+				catch
+				{
+					//failed doing dns get so we drop through to hardcoded
+				}
+
+				//make sure I always have enough seed nodes else scrounge from hardcoded list
+				pGetFillerIPsFromHardcoded(ref ipAddressesOut);
+			}
+
+			return ipAddressesOut;
+		}
+
+		public static List<PeerAddress> GetDNSSeedIPAddresses(String[] DNSHosts)
+		{
+			List<IPAddress[]> dnsServerIPArrays = new List<IPAddress[]>();
+			List<PeerAddress> ipAddressesOut = new List<PeerAddress>();
+
+			pGetDatabaseIPs(ref ipAddressesOut);
+
+			//couldn't get enough seeds from the db so get from dns
+			if (ipAddressesOut.Count < Globals.SeedNodeCount)
+			{
+				try
+				{
+
+					foreach (String host in DNSHosts)
+					{
+						try
+						{
+							dnsServerIPArrays.Add(Dns.GetHostAddresses(host));
+						}
+						catch
+						{
+							//allows for continuation if any dns server goes down
+						}
+					}
+
+					foreach (IPAddress[] iparr in dnsServerIPArrays)
+					{
+						foreach (IPAddress ip in iparr)
+						{
+							if (ipAddressesOut.Count >= Globals.SeedNodeCount)
+							{
+								//we have enough break the loop
+								break;
+							}
+
+							PeerAddress pa = new PeerAddress(ip, Globals.ProdP2PPort, (ulong)Globals.Services.NODE_NETWORK);
+
+							if (!ipAddressesOut.Contains(pa))
+							{
+								ipAddressesOut.Add(pa);
+							}
+						}
+					}
+				}
+				catch
+				{
+					//failed doing dns get so we drop through to hardcoded
+				}
+
+				//make sure I always have enough seed nodes else scrounge from hardcoded list
+				pGetFillerIPsFromHardcoded(ref ipAddressesOut);
+			}
+
+			return ipAddressesOut;
+		}
+
+		private static void pGetDatabaseIPs(ref List<PeerAddress> ipAddressesOut)
+		{
+			int diff = (Globals.SeedNodeCount - ipAddressesOut.Count);
+
+			//get newest addresses from database
+			if (diff > 0)
+			{
+				using (DatabaseConnection dBC = new DatabaseConnection())
+				{
+					ipAddressesOut.AddRange(dBC.GetTopXAddresses(diff));
+				}
+			}
+		}
+
+		private static void pGetFillerIPsFromHardcoded(ref List<PeerAddress> ipAddressesOut)
+		{
+			int diff = Globals.SeedNodeCount - ipAddressesOut.Count;
+			Random notCryptoRandom = new Random(DateTime.Now.Millisecond);
+
+			//fallback on hardcoded seeds if need be
+			if (diff > 0)
+			{
+				for (int i = 0; i < diff; i++)
+				{
+					int rIndx = notCryptoRandom.Next(0, HardSeedList.SeedIPStrings.Length);
+					PeerAddress pa = new PeerAddress(IPAddress.Parse(HardSeedList.SeedIPStrings[rIndx]), Globals.ProdP2PPort, (ulong)Globals.Services.NODE_NETWORK);
+					ipAddressesOut.Add(pa);
+				}
+			}
 		}
 
 		public static void AddToNodeTimeOffset(long add)
@@ -239,10 +377,10 @@ namespace Bitcoin.Lego.Network
 
 		public static ulong GetUTCNowWithOffset()
 		{
-			int peerCount = P2PConnectionManager.GetAllP2PConnections().Count;
+			int peerCount = GetAllP2PConnections().Count;
 			if (peerCount > 0) //protect from divide by zero
 			{
-				return Utilities.ToUnixTime(DateTime.UtcNow) + ((ulong)(P2PConnectionManager.NodeTimeOffset / P2PConnectionManager.GetAllP2PConnections().Count));
+				return Utilities.ToUnixTime(DateTime.UtcNow) + ((ulong)(NodeTimeOffset / GetAllP2PConnections().Count));
 			}
 
 			return Utilities.ToUnixTime(DateTime.UtcNow);

@@ -51,14 +51,10 @@ namespace Bitcoin.Lego.Network
 
 				if (_inbound) //the connection is incoming so we recieve their version message first
 				{
-					List<P2PConnection> checkDuplicate = P2PConnectionManager.GetInboundP2PConnections().FindAll(delegate (P2PConnection p2p)
+					//check it's not a duplicate connection
+					if (P2PConnectionManager.ConnectedToPeer(new PeerAddress(RemoteIPAddress,RemotePort,services)))
 					{
-						return p2p.RemoteIPAddress.Equals(RemoteIPAddress) && p2p.RemotePort.Equals(RemotePort);
-					});
-
-					if (checkDuplicate.Count > 0)
-					{
-						throw new Exception("Already "+checkDuplicate.Count+" Inbound Connections Matching "+RemoteIPAddress.ToString()+ ":"+RemotePort);
+						throw new Exception("Already Inbound Connection Matching "+RemoteIPAddress.ToString()+ ":"+RemotePort + " Not Attempting To Connect");
 					}
 
 					pConnectAndSetVersionAndStreams(services, blockHeight, relay);
@@ -96,14 +92,10 @@ namespace Bitcoin.Lego.Network
 				}
 				else //the connection is outgoing so we send our version message first
 				{
-					List<P2PConnection> checkDuplicate = P2PConnectionManager.GetOutboundP2PConnections().FindAll(delegate (P2PConnection p2p)
+					//check it's not a duplicate connection
+					if (P2PConnectionManager.ConnectedToPeer(new PeerAddress(RemoteIPAddress, RemotePort, services)))
 					{
-						return p2p.RemoteIPAddress.Equals(RemoteIPAddress) && p2p.RemotePort.Equals(RemotePort);
-					});
-
-					if (checkDuplicate.Count > 0)
-					{
-						throw new Exception("Already " + checkDuplicate.Count + " Outbound Connections Matching " + RemoteIPAddress.ToString() + ":" + RemotePort);
+						throw new Exception("Already Outbound Connection Matching " + RemoteIPAddress.ToString() + ":" + RemotePort + " Not Attempting To Connect");
 					}
 
 					pConnectAndSetVersionAndStreams(services, blockHeight, relay);
@@ -269,9 +261,10 @@ namespace Bitcoin.Lego.Network
 			{
 				while (Socket.Connected)
 				{
+					var message = Recieve();
+
 					try
-					{
-						var message = Recieve();
+					{						
 
 						//process the message appropriately
 						switch (message.GetType().Name)
@@ -295,148 +288,164 @@ namespace Bitcoin.Lego.Network
 								Thread addrThread = new Thread(new ThreadStart(() =>
 								{
 									AddToMemAddressPool(((AddressMessage)message).Addresses);
-								}));
+									
+									//those small addr messages we sometimes get we will relay any unexpired addrs in them, if they have no more than 4 addrs in them
+									if (((AddressMessage)message).Addresses.Count <= 4)
+									{
+										List<PeerAddress> paList = ((AddressMessage)message).Addresses.ToList();
+
+										AddressMessage addrOut = new AddressMessage(paList.Where(delegate (PeerAddress pa)
+										{
+											return pa.IsRelayExpired.Equals(false);
+										}).ToList());
+
+										BradcastSend(addrOut, new List<P2PConnection> { this });
+									}
+                                }));
 								addrThread.IsBackground = true;
 								addrThread.Start();
 								break;
 
+							//here we first get trusted addressed from DB that we have connected too and know are safe (as defined by blacklist behavior)
+							//then if we are connected to at least three other peers we will get addresses from each and every peer untill we hit out 2500 getaddr limit
 							case "GetAddresses":
 								Thread getAddrThread = new Thread(new ThreadStart(() =>
 								{
-									PeerAddress my_net_addr = GetMyExternalIP(_myVersionMessage.LocalServices);
-									List<PeerAddress> addrOne = new List<PeerAddress>() { my_net_addr };
-									List<PeerAddress> addrTwo = new List<PeerAddress>();
-									List<PeerAddress> addrThree = new List<PeerAddress>();
-									int maxAddresses = 2500;
+									List<PeerAddress> addressesToFireOut = new List<PeerAddress>();
+									int maxGetAddresses = 2500;
 
-									foreach (P2PConnection p2p in P2PConnectionManager.GetAllP2PConnections())
+									List<P2PConnection> allConnections = new List<P2PConnection>();
+									allConnections.AddRange(P2PConnectionManager.GetAllP2PConnections());
+
+									//get newest addrs from trusted addresses in DB as this is better than untrusted addresses relayed
+
+									if (Globals.EnableListenForPeers)
 									{
-										List<PeerAddress> nowPeerMAPool = new List<PeerAddress>();
-										nowPeerMAPool.AddRange(p2p.MemAddressPool);
+										//if I'm listening for peers add my addr to the response
+										PeerAddress my_net_addr = GetMyExternalIP(_myVersionMessage.LocalServices);
+										addressesToFireOut.Add(my_net_addr);
+									}
 
-                                        if (_memAddressPool.Count < (maxAddresses -1))
+									try
+									{
+										using (DatabaseConnection dbC = new DatabaseConnection())
 										{
-											if (((maxAddresses-1) - _memAddressPool.Count) > nowPeerMAPool.Count)
-											{
-												try
-												{
-													AddToMemAddressPool(nowPeerMAPool);
-												}
+											addressesToFireOut.AddRange(dbC.GetTopXAddresses(maxGetAddresses - addressesToFireOut.Count));
+										}
+									}
 #if (!DEBUG)
-												catch
-												{
+									catch
+									{
 
-												}
+									}
 #else
-												catch (Exception ex)
-												{
-													Console.WriteLine("Exception Adding Addresses To MemPool From Other P2PConnection 1: " + ex.Message);
-													if (ex.InnerException != null)
-													{
-														Console.WriteLine("Inner Exception: " + ex.InnerException.Message);
-													}
-												}
+									catch (Exception ex)
+									{
+										Console.WriteLine("Exception Getting Addresses From Database For Getaddr Response: " + ex.Message);
+										if (ex.InnerException != null)
+										{
+											Console.WriteLine("Inner Exception: " + ex.InnerException.Message);
+										}
+									}
 #endif
-											}
-											else
+									//now we pull addresses from our connected peers buckets, we get from every bucket no discrimination, we only do this if connected to at least 3 peers
+
+									if (allConnections.Count > 2)
+									{
+
+										//max addresses we still need to find
+										int diff = maxGetAddresses - addressesToFireOut.Count;
+										List<List<PeerAddress>> buckets = new List<List<PeerAddress>>();
+
+										int largestBucketSize = 0;
+
+										//build the buckets list
+										foreach (P2PConnection p2p in allConnections)
+										{
+											List<PeerAddress> bucketResidenceLadyOfTheHouseSpeaking = p2p.MemAddressPool;
+
+											if (bucketResidenceLadyOfTheHouseSpeaking.Count > largestBucketSize)
 											{
-												try
-												{
-													for (int i = 0; i < ((maxAddresses -1) - _memAddressPool.Count); i++)
-													{
-														AddToMemAddressPool(new List<PeerAddress> { nowPeerMAPool[i] });
-													}
-                                                }
-#if (!DEBUG)
-												catch
-												{
-
-												}
-#else
-												catch (Exception ex)
-												{
-													Console.WriteLine("Exception Adding Addresses To MemPool From Other P2PConnection 2: " + ex.Message);
-													if (ex.InnerException != null)
-													{
-														Console.WriteLine("Inner Exception: " + ex.InnerException.Message);
-													}
-												}
-#endif
+												largestBucketSize = bucketResidenceLadyOfTheHouseSpeaking.Count;
 											}
+
+											//sort this bucket by time
+											bucketResidenceLadyOfTheHouseSpeaking.Sort(delegate (PeerAddress px, PeerAddress py)
+											{
+												return py.Time.CompareTo(px.Time);
+											});
+
+											//add time sorted bucket to bucket list
+											buckets.Add(bucketResidenceLadyOfTheHouseSpeaking);
+										}
+
+										//add from each bucket
+										for (int i = 0; i < largestBucketSize; i++)
+										{
+											foreach (List<PeerAddress> bucket in buckets)
+											{
+												if (diff > 0)
+												{
+													try
+													{
+														//we are not out of bounds of the bucket ant the addr doesn't already exist in output set
+														if (i < bucket.Count && !addressesToFireOut.Any(delegate (PeerAddress pa) { return bucket[i].IPAddress.Equals(pa.IPAddress) && bucket[i].Port.Equals(pa.Port) && bucket[i].Time.Equals(pa.Time); }))
+														{
+															addressesToFireOut.Add(bucket[i]);
+															diff--;
+														}
+													}
+													catch
+													{
+
+													}
+												}
+											}
+										}
+									}
+
+									//send our up to three messages/2500 addresses
+									if (addressesToFireOut.Count > 0 )
+									{
+										if (addressesToFireOut.Count >= 1000)
+										{
+											//send the first lot of 1000
+											Send(new AddressMessage(addressesToFireOut.Take(1000).ToList()));
 										}
 										else
 										{
-											break;
+											//send what we can
+											Send(new AddressMessage(addressesToFireOut.Take(addressesToFireOut.Count).ToList()));
 										}
 									}
 
-									if (_memAddressPool.Count >= (maxAddresses-1))
+									if (addressesToFireOut.Count > 1000)
 									{
-										addrOne.AddRange(_memAddressPool.GetRange(0, 999));
-										addrTwo.AddRange(_memAddressPool.GetRange(999, 1000));
-										addrThree.AddRange(_memAddressPool.GetRange(1999, 500));
+										if (addressesToFireOut.Count >= 2000)
+										{
+											//send the second lot of 1000
+											Send(new AddressMessage(addressesToFireOut.Skip(1000).Take(1000).ToList()));
+										}
+										else
+										{
+											//send what we can
+											Send(new AddressMessage(addressesToFireOut.Skip(1000).Take(addressesToFireOut.Count - 1000).ToList()));
+										}
 									}
-									else
+
+									if (addressesToFireOut.Count > 2000)
 									{
-										int diff = (maxAddresses - _memAddressPool.Count);
-
-										//get addresses from the database
-										int idx = 0;
-										while (idx < _memAddressPool.Count)
+										if (addressesToFireOut.Count >= maxGetAddresses)
 										{
-											if (idx < 999)
-											{
-												addrOne.Add(_memAddressPool[idx]);
-											}
-											else if (idx < 1999)
-											{
-												addrTwo.Add(_memAddressPool[idx]);
-											}
-											else if(idx <2499)
-											{
-												addrThree.Add(_memAddressPool[idx]);
-											}
-
-											idx++;
+											//send the final 500 message address
+											Send(new AddressMessage(addressesToFireOut.Skip(2000).Take(maxGetAddresses-2000).ToList()));
 										}
-
-										using (DatabaseConnection dBC = new DatabaseConnection())
+										else
 										{
-											foreach(PeerAddress pa in dBC.GetTopXAddresses(diff))
-                                            {
-												if (idx < 999)
-												{
-													addrOne.Add(pa);
-												}
-												else if (idx < 1999)
-												{
-													addrTwo.Add(pa);
-												}
-												else if (idx < 2499)
-												{
-													addrThree.Add(pa);
-												}
-
-												idx++;
-											}
-                                        }
-
-										//send our up to three messages/2500 addresses
-										if (addrOne.Count > 0)
-										{
-											Send(new AddressMessage(addrOne));
+											//send what we can
+											Send(new AddressMessage(addressesToFireOut.Skip(2000).Take(addressesToFireOut.Count - 2000).ToList()));
 										}
-
-										if (addrTwo.Count > 0)
-										{
-											Send(new AddressMessage(addrTwo));
-										}
-
-										if (addrThree.Count > 0)
-										{
-											Send(new AddressMessage(addrThree));
-										}
-									}														
+									}													
 								}));
 								getAddrThread.IsBackground = true;
 								getAddrThread.Start();
@@ -445,12 +454,15 @@ namespace Bitcoin.Lego.Network
 							case "NullMessage":
 								try
 								{
-									//error or strange message, close connection, if aggressive reconnect on we shall reconnect and start anew
-									this.CloseConnection(true);
+#if (DEBUG)
+									Console.WriteLine("Killing Connection " + RemoteIPAddress.ToString() + " : " + RemotePort + " Couldn't Recieve Message");
+#endif
+									//error or strange message, close connection, if aggressive reconnect on we shall reconnect and start anew if outbound
+									CloseConnection(true);
 
 									if (Globals.AggressiveReconnect && ! InboundConnection)
 									{
-										P2PConnection p2pc = new P2PConnection(this.RemoteIPAddress, Globals.TCPMessageTimeout, new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp), TheirVersionMessage.TheirAddr.Port);
+										P2PConnection p2pc = new P2PConnection(RemoteIPAddress, Globals.TCPMessageTimeout, new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp), TheirVersionMessage.TheirAddr.Port);
 										if (p2pc.ConnectToPeer(MyVersionMessage.LocalServices, MyVersionMessage.StartBlockHeight, MyVersionMessage.Relay))
 										{
 											P2PConnectionManager.AddP2PConnection(p2pc);
@@ -475,7 +487,11 @@ namespace Bitcoin.Lego.Network
 #else
 					catch (Exception ex)
 					{
-						Console.WriteLine("Exception Message Listener: " + ex.Message);
+						if (message.GetType().Name.Equals("GetAddresses"))
+                        {
+
+						}
+                        Console.WriteLine("Exception Message Listener: " + ex.Message);
 						if (ex.InnerException != null)
 						{
 							Console.WriteLine("Inner Exception: " + ex.InnerException.Message);
@@ -652,112 +668,25 @@ namespace Bitcoin.Lego.Network
 				}
 #endif
 			}
-		}
-
-		public static async Task<List<PeerAddress>> GetDNSSeedIPAddressesAsync(String[] DNSHosts)
-		{
-			List<IPAddress[]> dnsServerIPArrays = new List<IPAddress[]>();
-			List<PeerAddress> ipAddressesOut = new List<PeerAddress>();
-
-			foreach (String host in DNSHosts)
-			{
-				IPAddress[] addrs = await Dns.GetHostAddressesAsync(host);
-				dnsServerIPArrays.Add(addrs);
-			}
-
-			foreach (IPAddress[] iparr in dnsServerIPArrays)
-			{
-				foreach (IPAddress ip in iparr)
-				{
-					PeerAddress pa = new PeerAddress(ip, Globals.ProdP2PPort, (ulong)Globals.Services.NODE_NETWORK);
-
-					if (!ipAddressesOut.Contains(pa))
-					{
-						ipAddressesOut.Add(pa);
-					}
-				}
-			}
-
-			//make sure I always have at least 100 seed nodes to check against
-			pGetFillerIPs(ref ipAddressesOut);
-
-			return ipAddressesOut;
-		}
-
-		private static void pGetFillerIPs(ref List<PeerAddress> ipAddressesOut)
-		{
-			int weWantThisMany = 100;
-			Random notCryptoRandom = new Random(DateTime.Now.Millisecond);
-			int diff = (weWantThisMany - ipAddressesOut.Count);
-
-			//get newest addresses from database
-			if (diff > 0)
-			{
-				using (DatabaseConnection dBC = new DatabaseConnection())
-				{
-					ipAddressesOut.AddRange(dBC.GetTopXAddresses(diff));
-				}
-			}
-
-			diff = weWantThisMany - ipAddressesOut.Count;
-
-			//fallback on hardcoded seeds if need be
-			if (diff > 0)
-			{
-				for (int i = 0; i < diff; i++)
-				{
-					int rIndx = notCryptoRandom.Next(0, HardSeedList.SeedIPStrings.Length);
-					PeerAddress pa = new PeerAddress(IPAddress.Parse(HardSeedList.SeedIPStrings[rIndx]), Globals.ProdP2PPort, (ulong)Globals.Services.NODE_NETWORK);
-					ipAddressesOut.Add(pa);
-				}
-			}
-		}
-
-		public static List<PeerAddress> GetDNSSeedIPAddresses(String[] DNSHosts)
-		{
-			List<IPAddress[]> dnsServerIPArrays = new List<IPAddress[]>();
-			List<PeerAddress> ipAddressesOut = new List<PeerAddress>();
-
-			foreach (String host in DNSHosts)
-			{
-
-				dnsServerIPArrays.Add(Dns.GetHostAddresses(host));
-			}
-
-			foreach (IPAddress[] iparr in dnsServerIPArrays)
-			{
-				foreach (IPAddress ip in iparr)
-				{
-					PeerAddress pa = new PeerAddress(ip, Globals.ProdP2PPort, (ulong)Globals.Services.NODE_NETWORK);
-
-					if (!ipAddressesOut.Contains(pa))
-					{
-						ipAddressesOut.Add(pa);
-					}
-				}
-			}
-
-			//make sure I always have at least 100 seed nodes to check against
-			pGetFillerIPs(ref ipAddressesOut);
-
-			return ipAddressesOut;
-		}
+		}		
 
 		public static void BradcastSendToOutbound(Message message, List<P2PConnection> exclusions)
 		{
 			Thread broadcastMessageThread = new Thread(new ThreadStart(() =>
 			{
-				List<P2PConnection> allOutCons = P2PConnectionManager.GetOutboundP2PConnections();
-
+                // by creating a new list we allow for the case where clients disconnect during broadcast
+                List < P2PConnection > allOutConnections = new List<P2PConnection>();
+				allOutConnections.AddRange(P2PConnectionManager.GetOutboundP2PConnections());
+ 
 				foreach (P2PConnection exl in exclusions)
 				{
-					allOutCons.RemoveAll(delegate (P2PConnection p2p)
+					allOutConnections.RemoveAll(delegate (P2PConnection p2p)
 					{
-						return p2p.RemoteIPAddress == exl.RemoteIPAddress;
+						return p2p.RemoteIPAddress.Equals(exl.RemoteIPAddress) && p2p.RemotePort.Equals(exl.RemotePort);
 					});
 				}
 
-				foreach (P2PConnection p2p in allOutCons)
+				foreach (P2PConnection p2p in allOutConnections)
 				{
 					p2p.Send(message);
 				}
@@ -770,7 +699,11 @@ namespace Bitcoin.Lego.Network
 		{
 			Thread broadcastMessageThread = new Thread(new ThreadStart(() =>
 			{
-				foreach (P2PConnection p2p in P2PConnectionManager.GetOutboundP2PConnections())
+				//by creating a new list we allow for the case where clients disconnect during broadcast
+				List<P2PConnection> allOutConnections = new List<P2PConnection>();
+				allOutConnections.AddRange(P2PConnectionManager.GetOutboundP2PConnections());
+
+				foreach (P2PConnection p2p in allOutConnections)
 				{
 					p2p.Send(message);
 				}
@@ -783,19 +716,21 @@ namespace Bitcoin.Lego.Network
 		{
 			Thread broadcastMessageThread = new Thread(new ThreadStart(() =>
 			{
-				List<P2PConnection> allInCons = P2PConnectionManager.GetInboundP2PConnections();
+				//by creating a new list we allow for the case where clients disconnect during broadcast
+				List<P2PConnection> allInConnections = new List<P2PConnection>();
+				allInConnections.AddRange(P2PConnectionManager.GetInboundP2PConnections());
 
 				foreach (P2PConnection exl in exclusions)
 				{
-					allInCons.RemoveAll(delegate (P2PConnection p2p)
+					allInConnections.RemoveAll(delegate (P2PConnection p2p)
 					{
-						return p2p.RemoteIPAddress == exl.RemoteIPAddress;
+						return p2p.RemoteIPAddress.Equals(exl.RemoteIPAddress) && p2p.RemotePort.Equals(exl.RemotePort);
 					});
 				}
 
-				foreach (P2PConnection p2p in allInCons)
+				foreach (P2PConnection p2p in allInConnections)
 				{
-					p2p.Send(message);
+                    p2p.Send(message);
 				}
 			}));
 			broadcastMessageThread.IsBackground = true;
@@ -806,7 +741,11 @@ namespace Bitcoin.Lego.Network
 		{
 			Thread broadcastMessageThread = new Thread(new ThreadStart(() =>
 			{
-				foreach (P2PConnection p2p in P2PConnectionManager.GetInboundP2PConnections())
+				//by creating a new list we allow for the case where clients disconnect during broadcast
+				List<P2PConnection> allInConnections = new List<P2PConnection>();
+				allInConnections.AddRange(P2PConnectionManager.GetInboundP2PConnections());
+
+				foreach (P2PConnection p2p in allInConnections)
 				{
 					p2p.Send(message);
 				}
@@ -825,17 +764,19 @@ namespace Bitcoin.Lego.Network
 		{
 			Thread broadcastMessageThread = new Thread(new ThreadStart(() =>
 			{
-				List<P2PConnection> allCons = P2PConnectionManager.GetAllP2PConnections();
+				//by creating a new list we allow for the case where clients disconnect during broadcast
+				List<P2PConnection> allConnections = new List<P2PConnection>();
+				allConnections.AddRange(P2PConnectionManager.GetAllP2PConnections());
 
 				foreach (P2PConnection exl in exclusions)
 				{
-					allCons.RemoveAll(delegate (P2PConnection p2p)
+					allConnections.RemoveAll(delegate (P2PConnection p2p)
 					{
-						return p2p.RemoteIPAddress == exl.RemoteIPAddress;
+						return p2p.RemoteIPAddress.Equals(exl.RemoteIPAddress) && p2p.RemotePort.Equals(exl.RemotePort);
 					});
 				}
 	
-				foreach (P2PConnection p2p in allCons)
+				foreach (P2PConnection p2p in allConnections)
 				{
 					p2p.Send(message);
 				}
@@ -852,7 +793,11 @@ namespace Bitcoin.Lego.Network
 		{
 			Thread broadcastMessageThread = new Thread(new ThreadStart(() =>
 			{
-				foreach (P2PConnection p2p in P2PConnectionManager.GetAllP2PConnections())
+				//by creating a new list we allow for the case where clients disconnect during broadcast
+				List<P2PConnection> allConnections = new List<P2PConnection>();
+				allConnections.AddRange(P2PConnectionManager.GetAllP2PConnections());
+
+				foreach (P2PConnection p2p in allConnections)
 				{
 					p2p.Send(message);
 				}
@@ -894,7 +839,10 @@ namespace Bitcoin.Lego.Network
 			}
 			else
 			{
-				this.CloseConnection(true);
+#if (DEBUG)
+				Console.WriteLine("Killing Connection " + this.RemoteIPAddress.ToString() + " : "+this.RemotePort + " Couldn't Send Message Socket Disconnected");
+#endif
+				CloseConnection(true);
 			}
 
 			return false;
@@ -938,8 +886,9 @@ namespace Bitcoin.Lego.Network
 
 		private void AddToMemAddressPool(IList<PeerAddress> addresses)
 		{
-			foreach(PeerAddress pa in addresses)
-            {
+			foreach (PeerAddress pa in addresses)
+			{
+				
 				try
 				{
 					if (_addressCursor >= Globals.AddressMemPoolMax)
@@ -947,13 +896,22 @@ namespace Bitcoin.Lego.Network
 						_addressCursor = 0;
 					}
 
-					List<PeerAddress> dups = _memAddressPool.FindAll(delegate (PeerAddress pa2)
+					//remove any duplicate older addresses exist if it is older
+					_memAddressPool.RemoveAll(delegate (PeerAddress pa2)
+					{
+						return pa.IPAddress.Equals(pa2.IPAddress) && pa.Port.Equals(pa2.Port) && pa.Time > pa2.Time;
+					});
+
+					//now we have removed old ones see if any remainh
+					List<PeerAddress> duplicates = _memAddressPool.FindAll(delegate (PeerAddress pa2)
 					{
 						return pa.IPAddress.Equals(pa2.IPAddress) && pa.Port.Equals(pa2.Port);
 					});
-
-					if (!pa.IsExpired && dups.Count <=0 )
+					
+					//if none remain we add
+					if (duplicates.Count <= 0)
 					{
+						//we removed older duplicates so add new
 						if (_memAddressPool.Count < Globals.AddressMemPoolMax)
 						{
 							_memAddressPool.Add(pa);
@@ -968,12 +926,12 @@ namespace Bitcoin.Lego.Network
 #if (!DEBUG)
 				catch
 				{
-
+				
 				}
 #else
 				catch (Exception ex)
 				{
-					Console.WriteLine("Exception Add Addr To Mem Pool: "+ ex.Message);
+					Console.WriteLine("Exception Add Addr To Mem Pool: " + ex.Message);
 					if (ex.InnerException != null)
 					{
 						Console.WriteLine("Inner Exception: " + ex.InnerException.Message);

@@ -131,7 +131,7 @@ namespace Bitcoin.Lego.Data_Interface
 					OpenDBConnection();
 				}
 
-				if (addressToAdd.IsExpired)
+				if (addressToAdd.IsRelayExpired)
 				{
 					return false;
 				}
