@@ -280,19 +280,20 @@ namespace Bitcoin.Lego.Network
 							case "AddressMessage":
 								Thread addrThread = new Thread(new ThreadStart(() =>
 								{
-									AddToMemAddressPool(((AddressMessage)message).Addresses);
+									//add to mempool and get unseen addrs
+									List<PeerAddress> paList = AddToMemAddressPool(((AddressMessage)message).Addresses);
 
-									//we will relay any unexpired addrs if the message has no more than 50 addrs in it
-									if (((AddressMessage)message).Addresses.Count <= 50)
+									//we will relay any unexpired addrs if the message has no more than 100 unseen addrs in it
+									if (paList.Count <= 100)
 									{
-										List<PeerAddress> paList = ((AddressMessage)message).Addresses.ToList();
-
-										AddressMessage addrOut = new AddressMessage(paList.Where(delegate (PeerAddress pa)
+										List<PeerAddress> peers = paList.Where(delegate (PeerAddress pa)
 										{
 											return pa.IsRelayExpired.Equals(false);
-										}).ToList());										
+										}).ToList();
 
-										//we wont relay at a rate faster than every 3 seconds from a connection to avoid a broadcast attack
+										AddressMessage addrOut = new AddressMessage(peers);						
+
+										//we wont relay at a rate faster than every 3 seconds from a connection to avoid a broadcast flood attack
 										if (addrOut.Addresses.Count > 0 && _lastRelayedAddrMessageTime < (P2PConnectionManager.GetUTCNowWithOffset()-3))
 										{
 											BradcastSend(addrOut, new List<P2PConnection> { this });
@@ -537,7 +538,7 @@ namespace Bitcoin.Lego.Network
 						//send my addr to the peer I've just connected too, remember i include the port I am LISTENING on so they can connect to me	
 						PeerAddress my_net_addr = GetMyExternalIP(_myVersionMessage.LocalServices, Globals.LocalP2PListeningPort);
 						Send(new AddressMessage(new List<PeerAddress>() { my_net_addr }));
-						int getaddrDelay = new Random(Environment.TickCount).Next(500, 60001);
+						int getaddrDelay = new Random(Environment.TickCount).Next(500, 5001);
 						Thread.Sleep(getaddrDelay);
 						Send(new GetAddresses());
 						Thread.Sleep((Globals.AddrFartInterval - getaddrDelay));
@@ -819,8 +820,10 @@ namespace Bitcoin.Lego.Network
 			return new NullMessage();
 		}
 
-		private void AddToMemAddressPool(IList<PeerAddress> addresses)
+		private List<PeerAddress> AddToMemAddressPool(IList<PeerAddress> addresses)
 		{
+			List<PeerAddress> relayPeers = new List<PeerAddress>();
+
 			foreach (PeerAddress pa in addresses)
 			{
 				
@@ -832,7 +835,7 @@ namespace Bitcoin.Lego.Network
 					}
 
 					//remove any duplicate older addresses exist if it is older
-					_memAddressPool.RemoveAll(delegate (PeerAddress pa2)
+					int deleted = _memAddressPool.RemoveAll(delegate (PeerAddress pa2)
 					{
 						return pa.IPAddress.Equals(pa2.IPAddress) && pa.Port.Equals(pa2.Port) && pa.Time > pa2.Time;
 					});
@@ -842,6 +845,8 @@ namespace Bitcoin.Lego.Network
 					{
 						return pa.IPAddress.Equals(pa2.IPAddress) && pa.Port.Equals(pa2.Port);
 					});
+
+					deleted += duplicates.Count;
 
 					//if none remain we add
 					if (duplicates.Count <= 0)
@@ -857,6 +862,11 @@ namespace Bitcoin.Lego.Network
 							_addressCursor++;
 						}
 
+					}
+
+					if (deleted == 0)
+					{
+						relayPeers.Add(pa);
 					}
 				}
 #if (!DEBUG)
@@ -875,6 +885,8 @@ namespace Bitcoin.Lego.Network
 				}
 #endif
 			}
+
+			return relayPeers;
 		}
 
 		public VersionMessage MyVersionMessage

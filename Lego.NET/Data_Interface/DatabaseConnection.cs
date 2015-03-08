@@ -88,10 +88,10 @@ namespace Bitcoin.Lego.Data_Interface
 					_sqlConnectionObj.Open();
 				}
 #if (!DEBUG)
-			catch
-			{
-				return false
-			}
+				catch
+				{
+					return false;
+				}
 #else
 				catch (Exception ex)
 				{

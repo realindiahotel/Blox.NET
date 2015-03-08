@@ -23,7 +23,6 @@ namespace Bitcoin.Lego.Network
 		private static bool _managing = false;
 		private static Thread _listenThread;
 		private static Thread _manageOutConnectionsThread;
-
 		private static List<P2PConnection> _p2pInboundConnections = new List<P2PConnection>();
 		private static List<P2PConnection> _p2pOutboundConnections = new List<P2PConnection>();
 		private static long _nodeNetworkOffset = 0;
@@ -69,7 +68,7 @@ namespace Bitcoin.Lego.Network
 								{
 									//we've accepted a new peer create a new P2PConnection object to deal with them and we need to be sure to mark it as incoming so it gets stored appropriately
 									P2PConnection p2pconnecting = new P2PConnection(((IPEndPoint)newConnectedPeerSock.RemoteEndPoint).Address, Globals.HeartbeatTimeout, newConnectedPeerSock, ((IPEndPoint)newConnectedPeerSock.RemoteEndPoint).Port, true);
-									p2pconnecting.ConnectToPeer((ulong)Globals.Services.NODE_NETWORK, 1, (int)Globals.Relay.RELAY_ALWAYS);
+									p2pconnecting.ConnectToPeer((ulong)Globals.Services.NODE_NETWORK, 346751, (int)Globals.Relay.RELAY_ALWAYS);
 								}
 								else
 								{
@@ -193,7 +192,7 @@ namespace Bitcoin.Lego.Network
 									connectToMe = new P2PConnection(pa.IPAddress, Globals.HeartbeatTimeout, new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp), pa.Port);
 								}
 
-								if (connectToMe.ConnectToPeer((ulong)Globals.Services.NODE_NETWORK, 1, (int)Globals.Relay.RELAY_ALWAYS))
+								if (connectToMe.ConnectToPeer((ulong)Globals.Services.NODE_NETWORK, 346751, (int)Globals.Relay.RELAY_ALWAYS))
 								{
                                     connectedTo++;
 									//always we sleep 500ms after an outgoing connection
