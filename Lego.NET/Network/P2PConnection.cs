@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using System.ComponentModel;
 using System.Net.Sockets;
 using System.Net;
 using System.IO;
@@ -21,9 +22,9 @@ namespace Bitcoin.Lego.Network
 		private bool _inbound;
 		private Thread _recieveMessagesThread;
 		private Thread _heartbeatThread;
-		private Thread _killDeadClientNoHeartbeatThread;
 		private Thread _addrFartThread;
-        private DateTime _lastRecievedMessage;
+        private ulong _lastRecievedMessageTime;
+		private ulong _lastRelayedAddrMessageTime;
 		private List<PeerAddress> _memAddressPool = new List<PeerAddress>();
 		private int _addressCursor = 0;
 
@@ -52,7 +53,8 @@ namespace Bitcoin.Lego.Network
 				if (_inbound) //the connection is incoming so we recieve their version message first
 				{
 					//check it's not a duplicate connection
-					if (P2PConnectionManager.ConnectedToPeer(new PeerAddress(RemoteIPAddress,RemotePort,services)))
+
+					if (P2PConnectionManager.ConnectedToPeer(new PeerAddress(RemoteIPAddress, RemotePort, services)))
 					{
 						throw new Exception("Already Inbound Connection Matching "+RemoteIPAddress.ToString()+ ":"+RemotePort + " Not Attempting To Connect");
 					}
@@ -144,6 +146,14 @@ namespace Bitcoin.Lego.Network
 						CloseConnection(true);
 					}
 				}
+
+				if (Socket.Connected)
+				{
+					//calculate time offset and adjust accordingly
+					_peerTimeOffset = (long)(TheirVersionMessage.Time - Utilities.ToUnixTime(DateTime.UtcNow));
+					P2PConnectionManager.AddToNodeTimeOffset(_peerTimeOffset);
+					P2PConnectionManager.AddP2PConnection(this);
+				}
 			}
 #if (!DEBUG)
 			catch
@@ -160,21 +170,6 @@ namespace Bitcoin.Lego.Network
 				}
 			}
 #endif
-			try
-			{
-				if (Socket.Connected)
-				{
-					//calculate time offset and adjust accordingly
-					_peerTimeOffset = (long)(TheirVersionMessage.Time - Utilities.ToUnixTime(DateTime.UtcNow));
-					P2PConnectionManager.AddToNodeTimeOffset(_peerTimeOffset);
-					P2PConnectionManager.AddP2PConnection(this);
-				}
-			}
-			catch
-			{
-
-			}	
-			
 			return Socket.Connected;
 		}
 
@@ -189,7 +184,9 @@ namespace Bitcoin.Lego.Network
 			DataIn = new NetworkStream(Socket, FileAccess.Read);
 			DataOut = new NetworkStream(Socket, FileAccess.Write);
 
-			Socket.SendTimeout = Socket.ReceiveTimeout = ConnectionTimeout;
+			Socket.ReceiveTimeout = ConnectionTimeout;
+			Socket.SendTimeout = 2000; //2 second timeout for sending messages
+			Socket.SetIPProtectionLevel(IPProtectionLevel.Unrestricted);
 
 			//add packetMagic for testnet
 			_myVersionMessage = new VersionMessage(RemoteIPAddress, Socket, services, RemotePort, blockHeight, relay);
@@ -199,10 +196,6 @@ namespace Bitcoin.Lego.Network
 			_heartbeatThread.IsBackground = true;
 			_heartbeatThread.Start();
 
-			//set thread for kill on no heartbeat
-			_killDeadClientNoHeartbeatThread = new Thread(new ThreadStart(pNoHeartbeatKillDeadClient));
-			_killDeadClientNoHeartbeatThread.IsBackground = true;
-			_killDeadClientNoHeartbeatThread.Start();
 		}
 
 		private bool pCheckVerack()
@@ -288,18 +281,23 @@ namespace Bitcoin.Lego.Network
 								Thread addrThread = new Thread(new ThreadStart(() =>
 								{
 									AddToMemAddressPool(((AddressMessage)message).Addresses);
-									
-									//those small addr messages we sometimes get we will relay any unexpired addrs in them, if they have no more than 4 addrs in them
-									if (((AddressMessage)message).Addresses.Count <= 4)
+
+									//we will relay any unexpired addrs if the message has no more than 50 addrs in it
+									if (((AddressMessage)message).Addresses.Count <= 50)
 									{
 										List<PeerAddress> paList = ((AddressMessage)message).Addresses.ToList();
 
 										AddressMessage addrOut = new AddressMessage(paList.Where(delegate (PeerAddress pa)
 										{
 											return pa.IsRelayExpired.Equals(false);
-										}).ToList());
+										}).ToList());										
 
-										BradcastSend(addrOut, new List<P2PConnection> { this });
+										//we wont relay at a rate faster than every 3 seconds from a connection to avoid a broadcast attack
+										if (addrOut.Addresses.Count > 0 && _lastRelayedAddrMessageTime < (P2PConnectionManager.GetUTCNowWithOffset()-3))
+										{
+											BradcastSend(addrOut, new List<P2PConnection> { this });
+											_lastRelayedAddrMessageTime = P2PConnectionManager.GetUTCNowWithOffset();
+										}
 									}
                                 }));
 								addrThread.IsBackground = true;
@@ -314,8 +312,7 @@ namespace Bitcoin.Lego.Network
 									List<PeerAddress> addressesToFireOut = new List<PeerAddress>();
 									int maxGetAddresses = 2500;
 
-									List<P2PConnection> allConnections = new List<P2PConnection>();
-									allConnections.AddRange(P2PConnectionManager.GetAllP2PConnections());
+									List<P2PConnection> allConnections = new List<P2PConnection>(P2PConnectionManager.GetAllP2PConnections());
 
 									//get newest addrs from trusted addresses in DB as this is better than untrusted addresses relayed
 
@@ -350,7 +347,7 @@ namespace Bitcoin.Lego.Network
 #endif
 									//now we pull addresses from our connected peers buckets, we get from every bucket no discrimination, we only do this if connected to at least 3 peers
 
-									if (allConnections.Count > 2)
+									if (allConnections.Count >= 3)
 									{
 
 										//max addresses we still need to find
@@ -462,7 +459,7 @@ namespace Bitcoin.Lego.Network
 
 									if (Globals.AggressiveReconnect && ! InboundConnection)
 									{
-										P2PConnection p2pc = new P2PConnection(RemoteIPAddress, Globals.TCPMessageTimeout, new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp), TheirVersionMessage.TheirAddr.Port);
+										P2PConnection p2pc = new P2PConnection(RemoteIPAddress, Globals.HeartbeatTimeout, new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp), TheirVersionMessage.TheirAddr.Port);
 										if (p2pc.ConnectToPeer(MyVersionMessage.LocalServices, MyVersionMessage.StartBlockHeight, MyVersionMessage.Relay))
 										{
 											P2PConnectionManager.AddP2PConnection(p2pc);
@@ -501,6 +498,7 @@ namespace Bitcoin.Lego.Network
 				}
 			}));
 			_recieveMessagesThread.IsBackground = true;
+			_recieveMessagesThread.Priority=ThreadPriority.Highest;
 			_recieveMessagesThread.Start();
 		}
 
@@ -509,15 +507,6 @@ namespace Bitcoin.Lego.Network
 			try
 			{
 				_heartbeatThread.Abort();
-			}
-			catch
-			{
-
-			}
-
-			try
-			{
-				_killDeadClientNoHeartbeatThread.Abort();
 			}
 			catch
 			{
@@ -548,10 +537,10 @@ namespace Bitcoin.Lego.Network
 						//send my addr to the peer I've just connected too, remember i include the port I am LISTENING on so they can connect to me	
 						PeerAddress my_net_addr = GetMyExternalIP(_myVersionMessage.LocalServices, Globals.LocalP2PListeningPort);
 						Send(new AddressMessage(new List<PeerAddress>() { my_net_addr }));
-						int getaddrDelay = new Random(DateTime.Now.Millisecond).Next(1000, 60001);
-						Thread.CurrentThread.Join(getaddrDelay);
+						int getaddrDelay = new Random(Environment.TickCount).Next(500, 60001);
+						Thread.Sleep(getaddrDelay);
 						Send(new GetAddresses());
-						Thread.CurrentThread.Join((Globals.AddrFartInterval - getaddrDelay));
+						Thread.Sleep((Globals.AddrFartInterval - getaddrDelay));
 #if (DEBUG)
 						Console.WriteLine("Send Addr Wakes Up");
 #endif
@@ -581,7 +570,7 @@ namespace Bitcoin.Lego.Network
 			{
 				try
 				{
-					Thread.CurrentThread.Join(Globals.HeartbeatTimeout); //send a heartbeat after the specified interval
+					Thread.Sleep(Globals.HeartbeatTimeout); //send a heartbeat after the specified interval
 
 					if (Globals.HeartbeatKeepAlive)
 					{
@@ -617,59 +606,6 @@ namespace Bitcoin.Lego.Network
 			}
 		}
 
-		private void pNoHeartbeatKillDeadClient()
-		{
-			int timeWait = (Globals.HeartbeatTimeout * 3); //90 minutes for kill (3 times specified heartbeat signal) so I just multiply heartbeat by 3
-
-            while (Socket.Connected)
-			{
-				try
-				{
-					Thread.CurrentThread.Join(timeWait);
-
-					if (Globals.DeadIfNoHeartbeat)
-					{
-						TimeSpan timeLapsed = DateTime.UtcNow - _lastRecievedMessage;
-
-						TimeSpan timeOut = new TimeSpan(timeWait * 10000);
-
-						if (timeLapsed > timeOut)
-						{
-							//no heartbeat time to kill connection
-							CloseConnection(true);
-#if (DEBUG)
-							Console.WriteLine("Inactive Client Killed: " + RemoteIPAddress + ":" + RemotePort);
-#endif
-						}
-
-						timeWait = (Globals.HeartbeatTimeout * 3) - Convert.ToInt32(timeLapsed.TotalMilliseconds);
-					}
-#if (DEBUG)
-					else
-					{
-						Console.WriteLine("Dead If No Heartbeat Off");
-
-					}
-#endif
-				}
-#if (!DEBUG)
-				catch
-				{
-
-				}
-#else
-				catch (Exception ex)
-				{
-					Console.WriteLine("Exception No Heartbeat Kill: " + ex.Message);
-					if (ex.InnerException != null)
-					{
-						Console.WriteLine("Inner Exception: " + ex.InnerException.Message);
-					}
-				}
-#endif
-			}
-		}		
-
 		public static void BradcastSendToOutbound(Message message, List<P2PConnection> exclusions)
 		{
 			Thread broadcastMessageThread = new Thread(new ThreadStart(() =>
@@ -695,7 +631,7 @@ namespace Bitcoin.Lego.Network
 			broadcastMessageThread.Start();
 		}
 
-		public void BradcastSendToOutbound(Message message)
+		public static void BradcastSendToOutbound(Message message)
 		{
 			Thread broadcastMessageThread = new Thread(new ThreadStart(() =>
 			{
@@ -712,7 +648,7 @@ namespace Bitcoin.Lego.Network
 			broadcastMessageThread.Start();
 		}
 
-		public void BradcastSendToInbound(Message message, List<P2PConnection> exclusions)
+		public static void BradcastSendToInbound(Message message, List<P2PConnection> exclusions)
 		{
 			Thread broadcastMessageThread = new Thread(new ThreadStart(() =>
 			{
@@ -737,7 +673,7 @@ namespace Bitcoin.Lego.Network
 			broadcastMessageThread.Start();
 		}
 
-		public void BradcastSendToInbound(Message message)
+		public static void BradcastSendToInbound(Message message)
 		{
 			Thread broadcastMessageThread = new Thread(new ThreadStart(() =>
 			{
@@ -760,13 +696,12 @@ namespace Bitcoin.Lego.Network
 		/// </summary>
 		/// <param name="message">Message to broadcast</param>
 		/// <param name="exclusions">P2PConnections you don't want to recieve the message for example if its a relayed message we don't want to return to sender</param>
-		public void BradcastSend(Message message, List<P2PConnection> exclusions)
+		public static void BradcastSend(Message message, List<P2PConnection> exclusions)
 		{
 			Thread broadcastMessageThread = new Thread(new ThreadStart(() =>
 			{
 				//by creating a new list we allow for the case where clients disconnect during broadcast
-				List<P2PConnection> allConnections = new List<P2PConnection>();
-				allConnections.AddRange(P2PConnectionManager.GetAllP2PConnections());
+				List<P2PConnection> allConnections = new List<P2PConnection>(P2PConnectionManager.GetAllP2PConnections());
 
 				foreach (P2PConnection exl in exclusions)
 				{
@@ -789,7 +724,7 @@ namespace Bitcoin.Lego.Network
 		///  Broadcasts a message to all connected P2P peers
 		/// </summary>
 		/// <param name="message">Message to broadcast</param>
-		public void BradcastSend(Message message)
+		public static void BradcastSend(Message message)
 		{
 			Thread broadcastMessageThread = new Thread(new ThreadStart(() =>
 			{
@@ -859,7 +794,7 @@ namespace Bitcoin.Lego.Network
 					try
 					{
 						var msg = ReadMessage();
-						_lastRecievedMessage = DateTime.UtcNow;
+						_lastRecievedMessageTime = P2PConnectionManager.GetUTCNowWithOffset();
 						return msg;
 					}
 #if (!DEBUG)
@@ -907,7 +842,7 @@ namespace Bitcoin.Lego.Network
 					{
 						return pa.IPAddress.Equals(pa2.IPAddress) && pa.Port.Equals(pa2.Port);
 					});
-					
+
 					//if none remain we add
 					if (duplicates.Count <= 0)
 					{
@@ -921,6 +856,7 @@ namespace Bitcoin.Lego.Network
 							_memAddressPool[_addressCursor] = pa;
 							_addressCursor++;
 						}
+
 					}
 				}
 #if (!DEBUG)

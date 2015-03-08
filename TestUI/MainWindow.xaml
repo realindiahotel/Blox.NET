@@ -6,17 +6,18 @@
         xmlns:local="clr-namespace:TestUI"
         mc:Ignorable="d"
         Title="MainWindow" Height="350" Width="525">
-    <Grid>
-        <Button x:Name="button" Content="Connect to a Peer" HorizontalAlignment="Left" VerticalAlignment="Top" Width="123" Margin="59,137,0,0" Click="button_Click"/>
-        <Button x:Name="button1" Content="Listen for Peers" HorizontalAlignment="Left" Margin="59,200,0,0" VerticalAlignment="Top" Width="123" Click="button1_Click"/>
-        <Button x:Name="button2" Content="Stop Listening" HorizontalAlignment="Left" Margin="59,254,0,0" VerticalAlignment="Top" Width="123" Click="button2_Click"/>
-        <Button x:Name="button3" Content="Ping" HorizontalAlignment="Left" Margin="218,137,0,0" VerticalAlignment="Top" Width="75" Click="button3_Click"/>
-        <Button x:Name="button4" Content="DNS Get" HorizontalAlignment="Left" Margin="218,184,0,0" VerticalAlignment="Top" Width="75" Click="button4_Click"/>
-        <Button x:Name="button5" Content="Connect to all DNS entrys" HorizontalAlignment="Left" Margin="218,236,0,0" VerticalAlignment="Top" Width="187" Click="button5_Click"/>
-        <Button x:Name="button6" Content="Get External IP" HorizontalAlignment="Left" Margin="330,137,0,0" VerticalAlignment="Top" Width="93" Click="button6_Click"/>
-        <Button x:Name="button7" Content="Show DB Connection String" HorizontalAlignment="Left" Margin="218,275,0,0" VerticalAlignment="Top" Width="187" Click="button7_Click"/>
-        <Label x:Name="label" Content="Label" HorizontalAlignment="Left" Margin="182,21,0,0" VerticalAlignment="Top"/>
-        <Button x:Name="button8" Content="Port Forward UPnP" HorizontalAlignment="Left" Margin="330,184,0,0" VerticalAlignment="Top" Width="116" Click="button8_Click"/>
+	<Grid>
+		<Button x:Name="button" Content="Connect to a Peer" HorizontalAlignment="Left" VerticalAlignment="Top" Width="123" Margin="10,157,0,0" Click="button_Click"/>
+		<Button x:Name="button1" Content="Listen for Peers" HorizontalAlignment="Left" Margin="10,236,0,0" VerticalAlignment="Top" Width="123" Click="button1_Click"/>
+		<Button x:Name="button2" Content="Stop Listening" HorizontalAlignment="Left" Margin="10,275,0,0" VerticalAlignment="Top" Width="123" Click="button2_Click"/>
+		<Button x:Name="button3" Content="Ping" HorizontalAlignment="Left" Margin="147,157,0,0" VerticalAlignment="Top" Width="75" Click="button3_Click"/>
+		<Button x:Name="button4" Content="DNS Get" HorizontalAlignment="Left" Margin="147,197,0,0" VerticalAlignment="Top" Width="75" Click="button4_Click"/>
+		<Button x:Name="button5" Content="Connect to all DNS entrys" HorizontalAlignment="Left" Margin="147,236,0,0" VerticalAlignment="Top" Width="205" Click="button5_Click"/>
+		<Button x:Name="button6" Content="Get External IP" HorizontalAlignment="Left" Margin="236,157,0,0" VerticalAlignment="Top" Width="116" Click="button6_Click"/>
+		<Button x:Name="button7" Content="Show DB Connection String" HorizontalAlignment="Left" Margin="147,275,0,0" VerticalAlignment="Top" Width="205" Click="button7_Click"/>
+		<Label x:Name="label" Content="Label" HorizontalAlignment="Left" Margin="182,21,0,0" VerticalAlignment="Top"/>
+		<Button x:Name="button8" Content="Port Forward UPnP" HorizontalAlignment="Left" Margin="236,197,0,0" VerticalAlignment="Top" Width="116" Click="button8_Click"/>
+		<Button x:Name="button9" Content="Connect &amp; Listen" HorizontalAlignment="Left" Margin="10,197,0,0" VerticalAlignment="Top" Width="123" Click="button9_Click"/>
 
-    </Grid>
+	</Grid>
 </Window>

@@ -14,6 +14,8 @@ using System.Windows.Navigation;
 using System.Windows.Shapes;
 using System.Runtime;
 using System.Threading;
+using System.ComponentModel;
+using System.Collections.ObjectModel;
 using System.Net;
 using Bitcoin.Lego;
 using Bitcoin.Lego.Network;
@@ -39,7 +41,7 @@ namespace TestUI
 		{
 			Thread connectThread = new Thread(new ThreadStart(() =>
 			{
-				p2p = new P2PConnection(IPAddress.Parse("83.143.130.10"), Globals.TCPMessageTimeout, new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp));
+				p2p = new P2PConnection(IPAddress.Parse("46.166.190.131"), Globals.HeartbeatTimeout, new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp),Globals.LocalP2PListeningPort);
                 bool success = p2p.ConnectToPeer(((ulong)Globals.Services.NODE_NETWORK), 1, ((int)Globals.Relay.RELAY_ALWAYS));
 
 				if (!success)
@@ -132,7 +134,7 @@ namespace TestUI
 			{
 				Thread connectThread = new Thread(new ThreadStart(() =>
 				{
-					P2PConnection p2p = new P2PConnection(ip.IPAddress, Globals.TCPMessageTimeout, new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp),ip.Port);
+					P2PConnection p2p = new P2PConnection(ip.IPAddress, Globals.HeartbeatTimeout, new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp),ip.Port);
 					p2p.ConnectToPeer(((ulong)Globals.Services.NODE_NETWORK), 1, (int)Globals.Relay.RELAY_ALWAYS);
 					
 				}));
@@ -155,6 +157,34 @@ namespace TestUI
 		private async void button8_Click(object sender, RoutedEventArgs e)
 		{
 			await Connection.SetNATPortForwardingUPnPAsync(Globals.LocalP2PListeningPort, Globals.LocalP2PListeningPort);
+		}
+
+		private async void button9_Click(object sender, RoutedEventArgs e)
+		{
+			Thread threadLable = new Thread(new ThreadStart(() =>
+			{
+				while (true)
+				{
+					Dispatcher.Invoke(() =>
+					{
+						List<P2PConnection> inNodes = P2PConnectionManager.GetInboundP2PConnections();
+						label.Content = "Inbound: " + inNodes.Count + " Outbound: " + P2PConnectionManager.GetOutboundP2PConnections().Count;
+
+						if (inNodes.Count > 0)
+						{
+
+						}
+					});
+
+					Thread.CurrentThread.Join(1000);
+				}
+			}));
+			threadLable.IsBackground = true;
+			threadLable.Start();
+
+			await P2PConnectionManager.ListenForIncomingP2PConnectionsAsync(IPAddress.Any, Globals.LocalP2PListeningPort);
+
+			P2PConnectionManager.MaintainConnectionsOutbound();
 		}
 	}
 }
