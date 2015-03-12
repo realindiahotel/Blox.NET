@@ -14,7 +14,6 @@ namespace Bitcoin.Lego.Protocol_Messages
 	[Serializable]
 	public class VersionMessage : Message
 	{
-		private uint _clientVersion = Globals.ClientVersion;
 		private ulong _localServices;
 		private ulong _time;		
 		public PeerAddress _theirAddr;
@@ -24,8 +23,6 @@ namespace Bitcoin.Lego.Protocol_Messages
 		private uint _startBlockHeight;
 		private int _relay;
 
-
-
 			/// <summary>
 			/// The version number of the protocol spoken.
 			/// </summary>
@@ -33,7 +30,7 @@ namespace Bitcoin.Lego.Protocol_Messages
 		{
 			get
 			{
-				return _clientVersion;
+				return ProtocolVersion;
 			}
 		}
 
@@ -117,39 +114,38 @@ namespace Bitcoin.Lego.Protocol_Messages
 			}
 		}
 
-		/// <exception cref="ProtocolException"/>
-		public VersionMessage(byte[] msg, uint packetMagic)
-			: base(msg, 0, true, packetMagic)
+		public VersionMessage(byte[] msg, P2PNetworkParamaters netParams)
+			: base(msg, 0, true, netParams)
 		{
+
 		}
 
-		public VersionMessage(IPAddress remoteIpAddress, Socket sock, ulong services, int remotePort, uint newBestHeight, int relay, uint packetMagic = Globals.ProdPacketMagic) :base(packetMagic)
+		public VersionMessage(IPAddress remoteIpAddress, int remotePort, Socket sock, uint newBestHeight, uint remoteClientVersion, P2PNetworkParamaters netParams, ulong remoteServices = (ulong)P2PNetworkParamaters.NODE_NETWORK.FULL_NODE) :base(netParams)
 		{
-			_localServices = services;
+			_localServices = P2PNetParameters.Services;
 			_time = P2PConnectionManager.GetUTCNowWithOffset();
-			_myAddr = new PeerAddress(IPAddress.Loopback, ((IPEndPoint)sock.LocalEndPoint).Port, services,Globals.ClientVersion,true);
-			_theirAddr = new PeerAddress(remoteIpAddress, remotePort, services, Globals.ClientVersion,true);
-			_nonce = Globals.NotCryptoRandomNonce;
-			_userAgent = Globals.UserAgentString;
+			_myAddr = new PeerAddress(IPAddress.Loopback, ((IPEndPoint)sock.LocalEndPoint).Port, netParams.Services, P2PNetParameters,true);
+			_theirAddr = new PeerAddress(remoteIpAddress, remotePort,remoteServices , P2PNetParameters,true);
+			_nonce = P2PNetworkParamaters.VersionConnectNonce;
+			_userAgent = P2PNetworkParamaters.UserAgentString;
 			_startBlockHeight = newBestHeight;
-			_relay = relay;
+			_relay = P2PNetParameters.Relay;
 		}
 
-			/// <exception cref="ProtocolException"/>
 		protected override void Parse()
 		{
-			_clientVersion = ReadUint32();
+			ProtocolVersion = ReadUint32();
 			_localServices = ReadUint64();
 			_time = ReadUint64();
-			MyAddr = new PeerAddress(Bytes, Cursor, Globals.ClientVersion, true);
+			MyAddr = new PeerAddress(Bytes, Cursor, true, new P2PNetworkParamaters(P2PNetworkParamaters.ProtocolVersion));
 			Cursor += MyAddr.MessageSize;
-			TheirAddr = new PeerAddress(Bytes, Cursor, _clientVersion, true);
+			TheirAddr = new PeerAddress(Bytes, Cursor, true, new P2PNetworkParamaters(P2PNetworkParamaters.ProtocolVersion));
 			Cursor += MyAddr.MessageSize;
 			_nonce = ReadUint64();
 			_userAgent = ReadStr();
 			_startBlockHeight = ReadUint32();
 			//Relay flag added in 70001
-			if (_clientVersion >= 70001)
+			if (ProtocolVersion >= 70001)
 			{
 				try
 				{
@@ -158,12 +154,12 @@ namespace Bitcoin.Lego.Protocol_Messages
 				catch
 				{
 					//I think if the relay is '0' it gets seen as end of data with the rest of the trailing 0's so this fixes that if we can't read the 0 make it 0 anyway
-					_relay = ((int)Globals.Relay.RELAY_ON_DEMAND);
+					_relay = ((int)P2PNetworkParamaters.RELAY.RELAY_ON_DEMAND);
 				}
 			}
 			else
 			{
-				_relay = ((int)Globals.Relay.RELAY_ALWAYS);
+				_relay = ((int)P2PNetworkParamaters.RELAY.RELAY_ALWAYS);
 			}
 		}
 
@@ -197,7 +193,7 @@ namespace Bitcoin.Lego.Protocol_Messages
 		/// </summary>
 		public bool HasBlockChain()
 		{
-			return (LocalServices & ((ulong)Globals.Services.NODE_NETWORK)) == ((ulong)Globals.Services.NODE_NETWORK);
+			return (LocalServices & ((ulong)P2PNetworkParamaters.NODE_NETWORK.FULL_NODE)) == ((ulong)P2PNetworkParamaters.NODE_NETWORK.FULL_NODE);
         }
 	}
 }

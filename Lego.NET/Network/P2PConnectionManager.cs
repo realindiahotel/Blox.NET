@@ -31,7 +31,7 @@ namespace Bitcoin.Lego.Network
 		public delegate List<P2PConnection> DelegateListP2PConnections();
 
 
-		public static async Task<bool> ListenForIncomingP2PConnectionsAsync(IPAddress ipInterfaceToBind, int portToBind = Globals.LocalP2PListeningPort)
+		public static async Task<bool> ListenForIncomingP2PConnectionsAsync(IPAddress ipInterfaceToBind, P2PNetworkParamaters netParams)
 		{
 			if (!_listening)
 			{
@@ -41,7 +41,7 @@ namespace Bitcoin.Lego.Network
 					_socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
 					_socket.LingerState = lo;
 					_listening = true;
-					_localEndPoint = new IPEndPoint(ipInterfaceToBind, portToBind);
+					_localEndPoint = new IPEndPoint(ipInterfaceToBind, netParams.P2PListeningPort);
 					if (_socket.IsBound)
 					{
 						_socket.Close();
@@ -49,10 +49,10 @@ namespace Bitcoin.Lego.Network
 					_socket.Bind(_localEndPoint);
 					_socket.Listen(1000);
 
-					if (Globals.UPNPMapPort)
+					if (netParams.UPnPMapPort)
 					{
 						//try upnp port forward mapping
-						await Connection.SetNATPortForwardingUPnPAsync(Globals.LocalP2PListeningPort, Globals.LocalP2PListeningPort);
+						await P2PConnection.SetNATPortForwardingUPnPAsync(netParams.P2PListeningPort, netParams.P2PListeningPort);
 					}
 
 					_listenThread = new Thread(new ThreadStart(() =>
@@ -64,11 +64,11 @@ namespace Bitcoin.Lego.Network
 								Socket newConnectedPeerSock = _socket.Accept();
 
 								//if we haven't reached maximum specified to connect to us, allow the connection
-								if (GetInboundP2PConnections().Count < Globals.MaxIncomingP2PConnections)
+								if (GetInboundP2PConnections().Count < P2PNetworkParamaters.MaxIncomingP2PConnections)
 								{
 									//we've accepted a new peer create a new P2PConnection object to deal with them and we need to be sure to mark it as incoming so it gets stored appropriately
-									P2PConnection p2pconnecting = new P2PConnection(((IPEndPoint)newConnectedPeerSock.RemoteEndPoint).Address, Globals.HeartbeatTimeout, newConnectedPeerSock, ((IPEndPoint)newConnectedPeerSock.RemoteEndPoint).Port, true);
-									p2pconnecting.ConnectToPeer((ulong)Globals.Services.NODE_NETWORK, 346751, (int)Globals.Relay.RELAY_ALWAYS);
+									P2PConnection p2pconnecting = new P2PConnection(((IPEndPoint)newConnectedPeerSock.RemoteEndPoint).Address, netParams, newConnectedPeerSock, ((IPEndPoint)newConnectedPeerSock.RemoteEndPoint).Port, true);
+									p2pconnecting.ConnectToPeer(346751);
 								}
 								else
 								{
@@ -140,7 +140,7 @@ namespace Bitcoin.Lego.Network
 			return true;
 		}
 
-		public static void MaintainConnectionsOutbound()
+		public static void MaintainConnectionsOutbound(P2PNetworkParamaters netParams)
 		{
 			//I'm going to preference trying peer relayed addresses if I have some this will assist discovery for new addr addition to the fallback DB, else I'll fall back to dnsseeds from db and elsewhere
 
@@ -160,39 +160,52 @@ namespace Bitcoin.Lego.Network
 						int connectedTo = allOutConnections.Count;
 
 						//if not connected to maximum outbound peers find and connect to one
-						while (connectedTo < Globals.MaxOutgoingP2PConnections && attempt < Globals.MaxOutgoingP2PConnections && _managing)
+						while (connectedTo < P2PNetworkParamaters.MaxOutgoingP2PConnections && attempt < P2PNetworkParamaters.MaxOutgoingP2PConnections && _managing)
 						{
 							try
 							{
 								List<P2PConnection> allConnections = new List<P2PConnection>(GetAllP2PConnections());
 								P2PConnection connectToMe = null;
+								PeerAddress pa = null;
 
-								//at least 3 peers connected so we will start to use peer addresses
-								if (allConnections.Count >= 3)
+								//at least 3 peers connected, or we are on testnet so we will start to use peer addresses
+								if (allConnections.Count >= 3 || (netParams.IsTestNet && allConnections.Count >0))
 								{
-									//get a random peer
-									P2PConnection p2p = pRandomPeer(allConnections, notCryptoRandom);
+										//get a random peer
+										P2PConnection p2p = pRandomPeer(allConnections, notCryptoRandom);
 
-									//I like to create a new list and fill it so we don't have to worry about the MemAddressPool changing while we are using it
-									List<PeerAddress> addrs = new List<PeerAddress>(p2p.MemAddressPool);
+										//I like to create a new list and fill it so we don't have to worry about the MemAddressPool changing while we are using it
+										List<PeerAddress> addrs = new List<PeerAddress>(p2p.MemAddressPool);
 
-									//at least 10 addresses to try
-									if (addrs.Count > 10)
-									{
-										PeerAddress pa = addrs[notCryptoRandom.Next(0, addrs.Count)];
-										connectToMe = new P2PConnection(pa.IPAddress, Globals.HeartbeatTimeout, new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp), pa.Port);
-									}
+										//at least 10 addresses to try
+										if (addrs.Count > 10)
+										{
+											//get random address from the random peer to try connect
+											pa = addrs[notCryptoRandom.Next(0, addrs.Count)];
+											connectToMe = new P2PConnection(pa.IPAddress, netParams, new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp), pa.Port);
+										}
 								}
 
 								//we dont have a connection so try get one from dns seeds
 								if (connectToMe == null)
 								{
-									List<PeerAddress> seeds = GetDNSSeedIPAddresses(Globals.DNSSeedHosts);
-									PeerAddress pa = seeds[notCryptoRandom.Next(0, seeds.Count)];
-									connectToMe = new P2PConnection(pa.IPAddress, Globals.HeartbeatTimeout, new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp), pa.Port);
+									//choose a random seed address to connect to
+									List<PeerAddress> seeds;
+
+									if (!netParams.IsTestNet)
+									{
+										seeds = GetDNSSeedIPAddresses(P2PNetworkParamaters.DNSSeedHosts, netParams);
+									}
+									else
+									{
+										seeds = GetDNSSeedIPAddresses(P2PNetworkParamaters.TestNetDNSSeedHosts, netParams);
+									}
+
+									pa = seeds[notCryptoRandom.Next(0, seeds.Count)];
+									connectToMe = new P2PConnection(pa.IPAddress, netParams, new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp), pa.Port);
 								}
 
-								if (connectToMe.ConnectToPeer((ulong)Globals.Services.NODE_NETWORK, 346751, (int)Globals.Relay.RELAY_ALWAYS))
+								if (connectToMe.ConnectToPeer(346751, pa.Services))
 								{
                                     connectedTo++;
 									//always we sleep 500ms after an outgoing connection
@@ -353,15 +366,19 @@ namespace Bitcoin.Lego.Network
 			return false;
 		}
 
-		public static async Task<List<PeerAddress>> GetDNSSeedIPAddressesAsync(String[] DNSHosts)
+		public static async Task<List<PeerAddress>> GetDNSSeedIPAddressesAsync(String[] DNSHosts, P2PNetworkParamaters netParams)
 		{
 			List<IPAddress[]> dnsServerIPArrays = new List<IPAddress[]>();
 			List<PeerAddress> ipAddressesOut = new List<PeerAddress>();
 
-			pGetDatabaseIPs(ref ipAddressesOut);
+			//only get from the db if we are not test net else force DNS resolving from the provided testnet dns hosts
+			if (!netParams.IsTestNet)
+			{
+				pGetDatabaseIPs(ref ipAddressesOut, netParams);
+			}
 
 			//couldn't get enough seeds from the db so get from dns
-			if (ipAddressesOut.Count < Globals.SeedNodeCount)
+			if (ipAddressesOut.Count < P2PNetworkParamaters.SeedNodeCount)
 			{
 				try
 				{
@@ -383,13 +400,13 @@ namespace Bitcoin.Lego.Network
 					{
 						foreach (IPAddress ip in iparr)
 						{
-							if (ipAddressesOut.Count >= Globals.SeedNodeCount)
+							if (ipAddressesOut.Count >= P2PNetworkParamaters.SeedNodeCount)
 							{
 								//we have enough break the loop
 								break;
 							}
 
-							PeerAddress pa = new PeerAddress(ip, Globals.ProdP2PPort, (ulong)Globals.Services.NODE_NETWORK);
+							PeerAddress pa = new PeerAddress(ip, P2PNetworkParamaters.ProdP2PPort, (ulong)P2PNetworkParamaters.NODE_NETWORK.FULL_NODE, netParams);
 
 							if (!ipAddressesOut.Contains(pa))
 							{
@@ -403,22 +420,29 @@ namespace Bitcoin.Lego.Network
 					//failed doing dns get so we drop through to hardcoded
 				}
 
-				//make sure I always have enough seed nodes else scrounge from hardcoded list
-				pGetFillerIPsFromHardcoded(ref ipAddressesOut);
+				//make sure I always have enough seed nodes else scrounge from hardcoded list *if not testnet
+				if (!netParams.IsTestNet)
+				{
+					pGetFillerIPsFromHardcoded(ref ipAddressesOut, netParams);
+				}
 			}
 
 			return ipAddressesOut;
 		}
 
-		public static List<PeerAddress> GetDNSSeedIPAddresses(String[] DNSHosts)
+		public static List<PeerAddress> GetDNSSeedIPAddresses(String[] DNSHosts, P2PNetworkParamaters netParams)
 		{
 			List<IPAddress[]> dnsServerIPArrays = new List<IPAddress[]>();
 			List<PeerAddress> ipAddressesOut = new List<PeerAddress>();
 
-			pGetDatabaseIPs(ref ipAddressesOut);
+			//only get from the db if we are not test net else force DNS resolving from the provided testnet dns hosts
+			if (!netParams.IsTestNet)
+			{
+				pGetDatabaseIPs(ref ipAddressesOut, netParams);
+			}
 
 			//couldn't get enough seeds from the db so get from dns
-			if (ipAddressesOut.Count < Globals.SeedNodeCount)
+			if (ipAddressesOut.Count < P2PNetworkParamaters.SeedNodeCount)
 			{
 				try
 				{
@@ -439,13 +463,22 @@ namespace Bitcoin.Lego.Network
 					{
 						foreach (IPAddress ip in iparr)
 						{
-							if (ipAddressesOut.Count >= Globals.SeedNodeCount)
+							if (ipAddressesOut.Count >= P2PNetworkParamaters.SeedNodeCount)
 							{
 								//we have enough break the loop
 								break;
 							}
 
-							PeerAddress pa = new PeerAddress(ip, Globals.ProdP2PPort, (ulong)Globals.Services.NODE_NETWORK);
+							PeerAddress pa;
+
+							if (!netParams.IsTestNet)
+							{
+								pa = new PeerAddress(ip, P2PNetworkParamaters.ProdP2PPort, (ulong)P2PNetworkParamaters.NODE_NETWORK.FULL_NODE, netParams);
+							}
+							else
+							{
+								pa = new PeerAddress(ip, P2PNetworkParamaters.TestP2PPort, (ulong)P2PNetworkParamaters.NODE_NETWORK.FULL_NODE, netParams);
+							}
 
 							if (!ipAddressesOut.Contains(pa))
 							{
@@ -459,30 +492,33 @@ namespace Bitcoin.Lego.Network
 					//failed doing dns get so we drop through to hardcoded
 				}
 
-				//make sure I always have enough seed nodes else scrounge from hardcoded list
-				pGetFillerIPsFromHardcoded(ref ipAddressesOut);
+				//make sure I always have enough seed nodes else scrounge from hardcoded list *if not testnet
+				if (!netParams.IsTestNet)
+				{
+					pGetFillerIPsFromHardcoded(ref ipAddressesOut, netParams);
+				}
 			}
 
 			return ipAddressesOut;
 		}
 
-		private static void pGetDatabaseIPs(ref List<PeerAddress> ipAddressesOut)
+		private static void pGetDatabaseIPs(ref List<PeerAddress> ipAddressesOut, P2PNetworkParamaters netParams)
 		{
-			int diff = (Globals.SeedNodeCount - ipAddressesOut.Count);
+			int diff = (P2PNetworkParamaters.SeedNodeCount - ipAddressesOut.Count);
 
 			//get newest addresses from database
 			if (diff > 0)
 			{
-				using (DatabaseConnection dBC = new DatabaseConnection())
+				using (DatabaseConnection dBC = new DatabaseConnection(netParams))
 				{
 					ipAddressesOut.AddRange(dBC.GetTopXAddresses(diff));
 				}
 			}
 		}
 
-		private static void pGetFillerIPsFromHardcoded(ref List<PeerAddress> ipAddressesOut)
+		private static void pGetFillerIPsFromHardcoded(ref List<PeerAddress> ipAddressesOut, P2PNetworkParamaters netParams)
 		{
-			int diff = Globals.SeedNodeCount - ipAddressesOut.Count;
+			int diff = P2PNetworkParamaters.SeedNodeCount - ipAddressesOut.Count;
 			Random notCryptoRandom = new Random(DateTime.Now.Millisecond);
 
 			//fallback on hardcoded seeds if need be
@@ -491,7 +527,17 @@ namespace Bitcoin.Lego.Network
 				for (int i = 0; i < diff; i++)
 				{
 					int rIndx = notCryptoRandom.Next(0, HardSeedList.SeedIPStrings.Length);
-					PeerAddress pa = new PeerAddress(IPAddress.Parse(HardSeedList.SeedIPStrings[rIndx]), Globals.ProdP2PPort, (ulong)Globals.Services.NODE_NETWORK);
+					PeerAddress pa;
+
+                    if (!netParams.IsTestNet)
+					{
+						 pa = new PeerAddress(IPAddress.Parse(HardSeedList.SeedIPStrings[rIndx]), P2PNetworkParamaters.ProdP2PPort, (ulong)P2PNetworkParamaters.NODE_NETWORK.FULL_NODE, netParams);
+					}
+					else
+					{
+						pa = new PeerAddress(IPAddress.Parse(HardSeedList.SeedIPStrings[rIndx]), P2PNetworkParamaters.TestP2PPort, (ulong)P2PNetworkParamaters.NODE_NETWORK.FULL_NODE, netParams);
+					}
+
 					ipAddressesOut.Add(pa);
 				}
 			}

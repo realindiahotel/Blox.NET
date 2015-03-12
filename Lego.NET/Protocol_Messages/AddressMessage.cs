@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Bitcoin.BitcoinUtilities;
+using Bitcoin.Lego.Network;
 using System.IO;
 
 namespace Bitcoin.Lego.Protocol_Messages
@@ -15,15 +16,17 @@ namespace Bitcoin.Lego.Protocol_Messages
 
 		internal IList<PeerAddress> Addresses { get; private set; }
 
-		internal AddressMessage(byte[] payload, int offset, uint packetMagic = Globals.ProdPacketMagic): base(payload, offset,true,packetMagic)
+		internal AddressMessage(byte[] payload, int offset, P2PNetworkParamaters netParams): base(payload, offset,true,netParams)
 		{
+
 		}
 
-		internal AddressMessage(byte[] payload, uint packetMagic = Globals.ProdPacketMagic): base(payload, 0, true, packetMagic)
+		internal AddressMessage(byte[] payload, P2PNetworkParamaters netParams) : base(payload, 0, true, netParams)
 		{
+
 		}
 
-		internal AddressMessage(List<PeerAddress> payloadAddresses, uint packetMagic = Globals.ProdPacketMagic) : base(packetMagic)
+		internal AddressMessage(List<PeerAddress> payloadAddresses, P2PNetworkParamaters netParams) : base(netParams)
 		{
 			Addresses = payloadAddresses;
 		}
@@ -37,7 +40,7 @@ namespace Bitcoin.Lego.Protocol_Messages
 			Addresses = new List<PeerAddress>((int)numAddresses);
 			for (var i = 0UL; i < numAddresses; i++)
 			{
-				var addr = new PeerAddress(Bytes, Cursor, ProtocolVersion, false);
+				var addr = new PeerAddress(Bytes, Cursor, false, P2PNetParameters);
 				Addresses.Add(addr);
 				Cursor += addr.MessageSize;
 			}

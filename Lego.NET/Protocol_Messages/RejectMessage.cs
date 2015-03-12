@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.IO;
 using Bitcoin.BitcoinUtilities;
+using Bitcoin.Lego.Network;
 
 namespace Bitcoin.Lego.Protocol_Messages
 {
@@ -60,12 +61,12 @@ namespace Bitcoin.Lego.Protocol_Messages
 			}
 		}
 
-		public RejectMessage(byte[] msg , uint packetMagic): base(msg, 0, true, packetMagic)
+		public RejectMessage(byte[] msg , P2PNetworkParamaters netParams) : base(msg, 0, true, netParams)
 		{
 
 		}
 
-		public RejectMessage(string message, ccode ccode, string reason, string data="", uint packetMagic = Globals.ProdPacketMagic) :base(packetMagic)
+		public RejectMessage(string message, ccode ccode, string reason, P2PNetworkParamaters netParams, string data="") :base(netParams)
 		{
 			_message = message;
 			_ccode = ccode;

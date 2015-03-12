@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Bitcoin.BitcoinUtilities;
+using Bitcoin.Lego.Network;
 using System.IO;
 
 namespace Bitcoin.Lego.Protocol_Messages
@@ -11,12 +12,12 @@ namespace Bitcoin.Lego.Protocol_Messages
 	public class Ping : Message
 	{
 		private ulong _nonce;
-		public Ping(byte[] payload, uint packetMagic = Globals.ProdPacketMagic) : base(payload, 0, true, packetMagic)
+		public Ping(byte[] payload, P2PNetworkParamaters netParams) : base(payload, 0, true, netParams)
 		{
 			
 		}
 
-		public Ping(uint packetMagic = Globals.ProdPacketMagic) : base(packetMagic)
+		public Ping(P2PNetworkParamaters netParams) : base(netParams)
 		{
 			_nonce = Convert.ToUInt64(DateTime.UtcNow.Ticks);
 		}

@@ -5,6 +5,7 @@ using Bitcoin.BitcoinUtilities;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Bitcoin.Lego.Network;
 
 namespace Bitcoin.Lego.Protocol_Messages
 {
@@ -19,12 +20,12 @@ namespace Bitcoin.Lego.Protocol_Messages
 		//maximum amount of items as defined in protocol specification
 		private const ulong _maxInventoryItems = 50000;
 
-		protected ListMessage(byte[] bytes, uint packetMagic) : base(bytes, 0, true, packetMagic)
+		protected ListMessage(byte[] bytes, P2PNetworkParamaters netParams) : base(bytes, 0, true, netParams)
 		{
 
 		}
 
-		protected ListMessage(uint packetMagic = Globals.ProdPacketMagic) : base(packetMagic)
+		protected ListMessage(P2PNetworkParamaters netParams) : base(netParams)
 		{
 			_items = new List<InventoryItem>();
 		}
@@ -75,7 +76,6 @@ namespace Bitcoin.Lego.Protocol_Messages
 			Bytes = null;
 		}
 
-		/// <exception cref="IOException"/>
 		public override void BitcoinSerializeToStream(Stream stream)
 		{
 			byte[] payloadCount = new VarInt((ulong)_items.Count).Encode();

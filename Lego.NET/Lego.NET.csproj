@@ -58,8 +58,8 @@
     <Compile Include="BitcoinSerializer.cs" />
     <Compile Include="Data_Interface\DatabaseConnection.cs" />
     <Compile Include="Network\HardSeedList.cs" />
-    <Compile Include="Network\Connection.cs" />
     <Compile Include="InventoryItem.cs" />
+    <Compile Include="Network\P2PNetworkParamaters.cs" />
     <Compile Include="Network\P2PConnectionManager.cs" />
     <Compile Include="Protocol_Messages\AddressMessage.cs" />
     <Compile Include="Protocol_Messages\GetAddresses.cs" />

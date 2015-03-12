@@ -31,6 +31,7 @@ namespace TestUI
 	public partial class MainWindow : Window
 	{
 		P2PConnection p2p;
+		P2PNetworkParamaters _networkParameters = new P2PNetworkParamaters(P2PNetworkParamaters.ProtocolVersion, true, 20966,1,1,true,false);
 
 		public MainWindow()
 		{
@@ -41,8 +42,8 @@ namespace TestUI
 		{
 			Thread connectThread = new Thread(new ThreadStart(() =>
 			{
-				p2p = new P2PConnection(IPAddress.Parse("212.5.147.152"), Globals.HeartbeatTimeout, new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp));
-                bool success = p2p.ConnectToPeer(((ulong)Globals.Services.NODE_NETWORK), 1, ((int)Globals.Relay.RELAY_ALWAYS));
+				p2p = new P2PConnection(IPAddress.Parse("82.45.214.119"), _networkParameters, new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp),18333);
+                bool success = p2p.ConnectToPeer(1);
 
 				if (!success)
 				{
@@ -92,7 +93,7 @@ namespace TestUI
 			threadLable.IsBackground = true;
 			threadLable.Start();
 
-			await P2PConnectionManager.ListenForIncomingP2PConnectionsAsync(IPAddress.Any,Globals.LocalP2PListeningPort);
+			await P2PConnectionManager.ListenForIncomingP2PConnectionsAsync(IPAddress.Any,_networkParameters);
 		}
 
 		private void button2_Click(object sender, RoutedEventArgs e)
@@ -102,19 +103,28 @@ namespace TestUI
 
 		private void button3_Click(object sender, RoutedEventArgs e)
 		{
-			p2p.Send(new Bitcoin.Lego.Protocol_Messages.Ping());
+			p2p.Send(new Bitcoin.Lego.Protocol_Messages.Ping(_networkParameters));
 		}
 
 		private async void button4_Click(object sender, RoutedEventArgs e)
 		{
-			List<PeerAddress> ips = await P2PConnectionManager.GetDNSSeedIPAddressesAsync(Globals.DNSSeedHosts);
+			List<PeerAddress> ips;
+
+            if (!_networkParameters.IsTestNet)
+			{
+				ips = await P2PConnectionManager.GetDNSSeedIPAddressesAsync(P2PNetworkParamaters.DNSSeedHosts, _networkParameters);
+			}
+			else
+			{
+				ips = await P2PConnectionManager.GetDNSSeedIPAddressesAsync(P2PNetworkParamaters.TestNetDNSSeedHosts, _networkParameters);
+			}
 			MessageBox.Show(ips.Count.ToString());
 
 		}
 
 		private async void button5_Click(object sender, RoutedEventArgs e)
 		{
-			List<PeerAddress> ips = await P2PConnectionManager.GetDNSSeedIPAddressesAsync(Globals.DNSSeedHosts);
+			List<PeerAddress> ips = await P2PConnectionManager.GetDNSSeedIPAddressesAsync(P2PNetworkParamaters.DNSSeedHosts, _networkParameters);
 
 			Thread threadLable = new Thread(new ThreadStart(() =>
 			{
@@ -134,8 +144,8 @@ namespace TestUI
 			{
 				Thread connectThread = new Thread(new ThreadStart(() =>
 				{
-					P2PConnection p2p = new P2PConnection(ip.IPAddress, Globals.HeartbeatTimeout, new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp),ip.Port);
-					p2p.ConnectToPeer(((ulong)Globals.Services.NODE_NETWORK), 1, (int)Globals.Relay.RELAY_ALWAYS);
+					P2PConnection p2p = new P2PConnection(ip.IPAddress, _networkParameters, new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp),ip.Port);
+					p2p.ConnectToPeer(1);
 					
 				}));
 				connectThread.IsBackground = true;
@@ -145,18 +155,18 @@ namespace TestUI
 
 		private async void button6_Click(object sender, RoutedEventArgs e)
 		{
-			PeerAddress myip = await Connection.GetMyExternalIPAsync((ulong)Globals.Services.NODE_NETWORK);
+			PeerAddress myip = await p2p.GetMyExternalIPAsync();
 			MessageBox.Show(myip.ToString());
 		}
 
 		private void button7_Click(object sender, RoutedEventArgs e)
 		{
-			MessageBox.Show(new DatabaseConnection().ConnectionString);
+			MessageBox.Show(new DatabaseConnection(_networkParameters).ConnectionString);
 		}
 
 		private async void button8_Click(object sender, RoutedEventArgs e)
 		{
-			await Connection.SetNATPortForwardingUPnPAsync(Globals.LocalP2PListeningPort, Globals.LocalP2PListeningPort);
+			await P2PConnection.SetNATPortForwardingUPnPAsync(_networkParameters.P2PListeningPort, _networkParameters.P2PListeningPort);
 		}
 
 		private async void button9_Click(object sender, RoutedEventArgs e)
@@ -182,9 +192,9 @@ namespace TestUI
 			threadLable.IsBackground = true;
 			threadLable.Start();
 
-			await P2PConnectionManager.ListenForIncomingP2PConnectionsAsync(IPAddress.Any, Globals.LocalP2PListeningPort);
+			await P2PConnectionManager.ListenForIncomingP2PConnectionsAsync(IPAddress.Any,_networkParameters);
 
-			P2PConnectionManager.MaintainConnectionsOutbound();
+			P2PConnectionManager.MaintainConnectionsOutbound(_networkParameters);
 		}
 	}
 }

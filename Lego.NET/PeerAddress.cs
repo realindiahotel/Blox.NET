@@ -27,9 +27,8 @@ namespace Bitcoin.Lego
 		/// <summary>
 		/// Construct a peer address from a serialized payload.
 		/// </summary>
-		public PeerAddress(byte[] payload, int offset, uint protocolVersion, bool isInVersionMessage, uint packetMagic = Globals.ProdPacketMagic):base(payload, offset, false, packetMagic, protocolVersion)
+		public PeerAddress(byte[] payload, int offset, bool isInVersionMessage, P2PNetworkParamaters netParams):base(payload, offset, false, netParams)
 		{
-			ProtocolVersion = protocolVersion;
 			_isInVersionMessage = isInVersionMessage;
 			Parse();
 		}
@@ -37,22 +36,22 @@ namespace Bitcoin.Lego
 		/// <summary>
 		/// Construct a peer address from a memorized or hardcoded address.
 		/// </summary>
-		public PeerAddress(IPAddress addr, int port, ulong services, uint protocolVersion = Globals.ClientVersion, bool isInVersionMessage = false)
+		public PeerAddress(IPAddress addr, int port, ulong services, P2PNetworkParamaters netParams, bool isInVersionMessage = false) :base(netParams)
 		{
 			_addr = addr;
 			_port = port;
 			_time = (uint)P2PConnectionManager.GetUTCNowWithOffset();			
-			ProtocolVersion = protocolVersion;
+			ProtocolVersion = netParams.ClientVersion;
 			_services = services;
 			_isInVersionMessage = isInVersionMessage;
 		}
 
-		public PeerAddress(IPAddress addr, int port, ulong services, uint time, uint protocolVersion = Globals.ClientVersion, bool isInVersionMessage = false)
+		public PeerAddress(IPAddress addr, int port, ulong services, uint time, P2PNetworkParamaters netParams, bool isInVersionMessage = false) :base(netParams)
 		{
 			_addr = addr;
 			_port = port;
 			_time = time;
-			ProtocolVersion = protocolVersion;
+			ProtocolVersion = netParams.ClientVersion;
 			_services = services;
 			_isInVersionMessage = isInVersionMessage;
 		}

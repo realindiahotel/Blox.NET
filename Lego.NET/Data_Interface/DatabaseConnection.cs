@@ -9,6 +9,7 @@ using System.Data.SqlClient;
 using Bitcoin.BitcoinUtilities;
 using Bitcoin.Lego.Protocol_Messages;
 using Bitcoin.Lego;
+using Bitcoin.Lego.Network;
 using System.Net;
 
 namespace Bitcoin.Lego.Data_Interface
@@ -22,9 +23,11 @@ namespace Bitcoin.Lego.Data_Interface
 		//using LocalDB - can be swapped out for other SQL Server derivatives, including AzureDB. If using Azure, beware the rate limiting, keep an eye for resource exceed exceptions if using Azure DB
 		private String _connectionString = @"Data Source=(localdb)\MSSQLLocalDB;Initial Catalog=LegoDB;Integrated Security=True;Connect Timeout=60;Encrypt=False;TrustServerCertificate=False";
 		private SqlConnection _sqlConnectionObj;
+		private P2PNetworkParamaters _networkParameters;
 
-		public DatabaseConnection()
+		public DatabaseConnection(P2PNetworkParamaters netParams)
 		{
+			_networkParameters = netParams;
 			_sqlConnectionObj = new SqlConnection(_connectionString);
 		}
 
@@ -188,7 +191,7 @@ namespace Bitcoin.Lego.Data_Interface
 				int currentPort = addressToCheck.Port;
 				ulong currentServices = addressToCheck.Services;
 
-				if (GetAddress(addressToCheck.IPAddress.ToString(), ref addressToCheck))
+				if (GetAddress(addressToCheck.IPAddress.ToString(), addressToCheck.Port, ref addressToCheck))
 				{
 					if (currentTime > addressToCheck.Time || currentPort != addressToCheck.Port || currentServices != addressToCheck.Services)
 					{
@@ -262,7 +265,7 @@ namespace Bitcoin.Lego.Data_Interface
 			return false;
 		}
 
-		private bool GetAddress(String ip, ref PeerAddress addressToGet)
+		private bool GetAddress(String ip, int port, ref PeerAddress addressToGet)
 		{
 			try
 			{
@@ -271,16 +274,18 @@ namespace Bitcoin.Lego.Data_Interface
 					OpenDBConnection();
 				}
 
-				using (SqlCommand getAddrCmd = new SqlCommand("SELECT * FROM [AddressPool] WHERE [IPAddress]=@Param1;", _sqlConnectionObj))
+				using (SqlCommand getAddrCmd = new SqlCommand("SELECT * FROM [AddressPool] WHERE [IPAddress]=@Param1 AND [Port]=@Param2;", _sqlConnectionObj))
 				{
 					getAddrCmd.Parameters.Add(new SqlParameter("@Param1", ip));
+					getAddrCmd.Parameters.Add(new SqlParameter("@Param2", port));
 
 					using (SqlDataReader dataReader = getAddrCmd.ExecuteReader())
 					{
 
 						if (dataReader.Read())
 						{
-							addressToGet = new PeerAddress(IPAddress.Parse(dataReader.GetString(0)), dataReader.GetInt32(3), Convert.ToUInt64(dataReader.GetInt64(2)), Convert.ToUInt32(dataReader.GetInt32(1)), Globals.ClientVersion, false);
+							P2PNetworkParamaters useTheseForAddr = new P2PNetworkParamaters(P2PNetworkParamaters.ProtocolVersion, _networkParameters.IsTestNet, dataReader.GetInt32(3), Convert.ToUInt64(dataReader.GetInt64(2)));
+                            addressToGet = new PeerAddress(IPAddress.Parse(dataReader.GetString(0)), useTheseForAddr.P2PListeningPort, useTheseForAddr.Services, Convert.ToUInt32(dataReader.GetInt32(1)), useTheseForAddr);
 							dataReader.Close();
 							return true;
 						}
@@ -293,7 +298,7 @@ namespace Bitcoin.Lego.Data_Interface
 			{
 				if (ex.Message.ToLower().Contains("deadlock"))
 				{
-					return GetAddress(ip, ref addressToGet);
+					return GetAddress(ip, port, ref addressToGet);
 				}
 #if(DEBUG)
 				Console.WriteLine("Exception Get Address DB: " + ex.Message);
@@ -327,8 +332,8 @@ namespace Bitcoin.Lego.Data_Interface
 
 						while(dataReader.Read())
 						{
-							addressesOut.Add(new PeerAddress(IPAddress.Parse(dataReader.GetString(0)), dataReader.GetInt32(3), Convert.ToUInt64(dataReader.GetInt64(2)), Convert.ToUInt32(dataReader.GetInt32(1)), Globals.ClientVersion, false));
-							
+							P2PNetworkParamaters netParams = new P2PNetworkParamaters(P2PNetworkParamaters.ProtocolVersion, _networkParameters.IsTestNet, dataReader.GetInt32(3), Convert.ToUInt64(dataReader.GetInt64(2)));
+                            addressesOut.Add(new PeerAddress(IPAddress.Parse(dataReader.GetString(0)), netParams.P2PListeningPort, netParams.Services, Convert.ToUInt32(dataReader.GetInt32(1)),netParams));		
 						}
 						dataReader.Close();
 					}
@@ -355,7 +360,7 @@ namespace Bitcoin.Lego.Data_Interface
 		private ulong pSanitiseServices(ulong services)
 		{
 			//saw some clients with weird big numbers in the service field, I don't trust them so they get treated as SPV nodes.
-			if (services != (ulong)Globals.Services.NODE_NETWORK && services != (ulong)Globals.Services.SPV_NODE_NETWORK)
+			if (services != (ulong)P2PNetworkParamaters.NODE_NETWORK.FULL_NODE && services != (ulong)P2PNetworkParamaters.NODE_NETWORK.SPV_NODE)
 			{
 				services = 0;
 			}

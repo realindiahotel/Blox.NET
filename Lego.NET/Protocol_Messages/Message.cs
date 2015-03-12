@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Bitcoin.BitcoinUtilities;
+using Bitcoin.Lego.Network;
 using System.IO;
 
 namespace Bitcoin.Lego.Protocol_Messages
@@ -12,6 +13,9 @@ namespace Bitcoin.Lego.Protocol_Messages
 	public abstract class Message
 	{
 		public const uint MaxSize = 0x2000000;
+
+		[NonSerialized]
+		private P2PNetworkParamaters _networkParameters;
 
 		[NonSerialized]
 		private int _offset;
@@ -60,18 +64,20 @@ namespace Bitcoin.Lego.Protocol_Messages
 			}
 		}
 
-		internal Message(uint packetMagic = Globals.ProdPacketMagic, uint protocolVersion = Globals.ClientVersion)
+		internal Message(P2PNetworkParamaters netParams)
 		{
-			_packetMagic = packetMagic;
-			_protocolVersion = protocolVersion;
+			_networkParameters = netParams;
+			_packetMagic = _networkParameters.PacketMagic;
+			_protocolVersion = _networkParameters.ClientVersion;
 		}
 		
-		internal Message(byte[] msg, int offset, bool runParse, uint packetMagic = Globals.ProdPacketMagic, uint protocolVersion = Globals.ClientVersion)
+		internal Message(byte[] msg, int offset, bool runParse, P2PNetworkParamaters netParams)
 		{
-			_protocolVersion = protocolVersion;
+			_networkParameters = netParams;
+			_protocolVersion = _networkParameters.ClientVersion;
 			_bytes = msg;
 			_cursor = _offset = offset;
-			_packetMagic = packetMagic;
+			_packetMagic = _networkParameters.PacketMagic;
 			if (runParse)
 			{
 				Parse();
@@ -93,7 +99,6 @@ namespace Bitcoin.Lego.Protocol_Messages
 		/// <summary>
 		/// Serializes this message to the provided stream. If you just want the raw bytes use bitcoinSerialize().
 		/// </summary>
-		/// <exception cref="IOException"/>
 		public virtual void BitcoinSerializeToStream(Stream stream)
 		{
 		}
@@ -101,6 +106,14 @@ namespace Bitcoin.Lego.Protocol_Messages
 		internal int MessageSize
 		{
 			get { return Cursor - Offset; }
+		}
+
+		internal P2PNetworkParamaters P2PNetParameters
+		{
+			get
+			{
+				return _networkParameters;
+			}
 		}
 
 		internal uint ReadUint32()

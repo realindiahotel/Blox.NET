@@ -5,18 +5,19 @@ using System.Text;
 using System.Threading.Tasks;
 using System.IO;
 using Bitcoin.BitcoinUtilities;
+using Bitcoin.Lego.Network;
 
 namespace Bitcoin.Lego.Protocol_Messages
 {
 	public class Pong : Message
 	{
 		private ulong _nonce;
-		public Pong(byte[] payload, uint packetMagic = Globals.ProdPacketMagic) : base(payload, 0, true, packetMagic)
+		public Pong(byte[] payload, P2PNetworkParamaters netParams) : base(payload, 0, true, netParams)
 		{
 			
 		}
 
-		public Pong(ulong nonce, uint packetMagic = Globals.ProdPacketMagic) : base(packetMagic)
+		public Pong(ulong nonce, P2PNetworkParamaters netParams) : base(netParams)
 		{
 			_nonce = nonce;
 		}

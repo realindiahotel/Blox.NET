@@ -4,17 +4,18 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Bitcoin.BitcoinUtilities;
+using Bitcoin.Lego.Network;
 
 namespace Bitcoin.Lego.Protocol_Messages
 {
 	[Serializable]
 	public class InventoryMessage : ListMessage
 	{
-		public InventoryMessage(byte[] bytes, uint packetMagic) : base(bytes,packetMagic)
+		public InventoryMessage(byte[] bytes, P2PNetworkParamaters netParams) : base(bytes,netParams)
 		{
 		}
 
-		public InventoryMessage(uint packetMagic = Globals.ProdPacketMagic) : base(packetMagic)
+		public InventoryMessage(P2PNetworkParamaters netParams) : base(netParams)
 		{
 		}
 	}

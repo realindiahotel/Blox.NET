@@ -5,6 +5,7 @@ using System.Text;
 using System.Linq;
 using System.Threading.Tasks;
 using Bitcoin.BitcoinUtilities;
+using Bitcoin.Lego.Network;
 using Bitcoin.Lego.Protocol_Messages;
 
 namespace Bitcoin.Lego
@@ -71,7 +72,7 @@ namespace Bitcoin.Lego
 		/// Reads a message from the given InputStream and returns it.
 		/// </summary>
 		/// <exception cref="IOException"/>
-		public Message Deserialize(Stream @in, uint packetMagic)
+		public Message Deserialize(Stream @in, P2PNetworkParamaters netParams)
 		{
 			// A BitCoin protocol message has the following format.
 			//
@@ -87,7 +88,7 @@ namespace Bitcoin.Lego
 			//
 			// Satoshi's implementation ignores garbage before the magic header bytes. We have to do the same because
 			// sometimes it sends us stuff that isn't part of any message.
-			SeekPastMagicBytes(@in, packetMagic);
+			SeekPastMagicBytes(@in, netParams.PacketMagic);
 			// Now read in the header.
 			var header = new byte[_commandLen + 8];
 			var readCursor = 0;
@@ -158,7 +159,7 @@ namespace Bitcoin.Lego
 
 			try
 			{
-				return MakeMessage(command, payloadBytes, packetMagic);
+				return MakeMessage(command, payloadBytes, netParams);
 			}
 			catch (Exception e)
 			{
@@ -166,40 +167,40 @@ namespace Bitcoin.Lego
 			}
 		}
 
-		private Message MakeMessage(string command, byte[] payloadBytes, uint packetMagic)
+		private Message MakeMessage(string command, byte[] payloadBytes, P2PNetworkParamaters netParams)
 		{
 			// We use an if ladder rather than reflection because reflection can be slow on some platforms.
 			if (command.Equals("version"))
 			{
-				return new VersionMessage(payloadBytes, packetMagic);
+				return new VersionMessage(payloadBytes, netParams);
 			}
 			if (command.Equals("verack"))
 			{
-				return new VersionAck(payloadBytes, packetMagic);
+				return new VersionAck(payloadBytes, netParams);
 			}
 			if (command.Equals("reject"))
 			{
-				return new RejectMessage(payloadBytes, packetMagic);
+				return new RejectMessage(payloadBytes, netParams);
 			}
 			if (command.Equals("ping"))
 			{
-				return new Ping(payloadBytes, packetMagic);
+				return new Ping(payloadBytes, netParams);
 			}
 			if (command.Equals("pong"))
 			{
-				return new Pong(payloadBytes, packetMagic);
+				return new Pong(payloadBytes, netParams);
 			}
 			if (command.Equals("inv"))
 			{
-				return new InventoryMessage(payloadBytes, packetMagic);
+				return new InventoryMessage(payloadBytes, netParams);
 			}
 			if (command.Equals("addr"))
 			{
-				return new AddressMessage(payloadBytes, packetMagic);
+				return new AddressMessage(payloadBytes, netParams);
 			}
 			if (command.Equals("getaddr"))
 			{
-				return new GetAddresses(payloadBytes, packetMagic);
+				return new GetAddresses(payloadBytes, netParams);
 			}/*
 			if (command.Equals("block"))
 			{

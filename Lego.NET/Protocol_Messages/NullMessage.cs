@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Bitcoin.Lego.Network;
 
 namespace Bitcoin.Lego.Protocol_Messages
 {
@@ -11,7 +12,7 @@ namespace Bitcoin.Lego.Protocol_Messages
 	/// </summary>
 	public class NullMessage :Message
 	{
-		public NullMessage()
+		public NullMessage(P2PNetworkParamaters netParams) :base(netParams)
 		{
 
 		}
