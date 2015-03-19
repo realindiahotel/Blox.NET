@@ -31,7 +31,7 @@ namespace TestUI
 	public partial class MainWindow : Window
 	{
 		P2PConnection p2p;
-		P2PNetworkParamaters _networkParameters = new P2PNetworkParamaters(P2PNetworkParamaters.ProtocolVersion, true, 20966,1,1,true,false);
+		P2PNetworkParameters _networkParameters = new P2PNetworkParameters(P2PNetworkParameters.ProtocolVersion, false, 20966,1,1,true,true);
 
 		public MainWindow()
 		{
@@ -42,7 +42,14 @@ namespace TestUI
 		{
 			Thread connectThread = new Thread(new ThreadStart(() =>
 			{
-				p2p = new P2PConnection(IPAddress.Parse("82.45.214.119"), _networkParameters, new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp),18333);
+				ushort port = 8333;
+
+				if (_networkParameters.IsTestNet)
+				{
+					port = 18333;
+				}
+
+				p2p = new P2PConnection(IPAddress.Parse("82.45.214.119"), _networkParameters, new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp),port);
                 bool success = p2p.ConnectToPeer(1);
 
 				if (!success)
@@ -112,11 +119,11 @@ namespace TestUI
 
             if (!_networkParameters.IsTestNet)
 			{
-				ips = await P2PConnectionManager.GetDNSSeedIPAddressesAsync(P2PNetworkParamaters.DNSSeedHosts, _networkParameters);
+				ips = await P2PConnectionManager.GetDNSSeedIPAddressesAsync(P2PNetworkParameters.DNSSeedHosts, _networkParameters);
 			}
 			else
 			{
-				ips = await P2PConnectionManager.GetDNSSeedIPAddressesAsync(P2PNetworkParamaters.TestNetDNSSeedHosts, _networkParameters);
+				ips = await P2PConnectionManager.GetDNSSeedIPAddressesAsync(P2PNetworkParameters.TestNetDNSSeedHosts, _networkParameters);
 			}
 			MessageBox.Show(ips.Count.ToString());
 
@@ -124,7 +131,7 @@ namespace TestUI
 
 		private async void button5_Click(object sender, RoutedEventArgs e)
 		{
-			List<PeerAddress> ips = await P2PConnectionManager.GetDNSSeedIPAddressesAsync(P2PNetworkParamaters.DNSSeedHosts, _networkParameters);
+			List<PeerAddress> ips = await P2PConnectionManager.GetDNSSeedIPAddressesAsync(P2PNetworkParameters.DNSSeedHosts, _networkParameters);
 
 			Thread threadLable = new Thread(new ThreadStart(() =>
 			{
@@ -144,7 +151,7 @@ namespace TestUI
 			{
 				Thread connectThread = new Thread(new ThreadStart(() =>
 				{
-					P2PConnection p2p = new P2PConnection(ip.IPAddress, _networkParameters, new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp),ip.Port);
+					P2PConnection p2p = new P2PConnection(ip.IPAddress, _networkParameters, new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp));
 					p2p.ConnectToPeer(1);
 					
 				}));

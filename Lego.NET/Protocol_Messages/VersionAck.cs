@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Bitcoin.BitcoinUtilities;
-using Bitcoin.Lego.Network;
+﻿using Bitcoin.Lego.Network;
 
 namespace Bitcoin.Lego.Protocol_Messages
 {
@@ -13,12 +7,12 @@ namespace Bitcoin.Lego.Protocol_Messages
 	/// </summary>
 	public class VersionAck : Message
 	{
-		public VersionAck(P2PNetworkParamaters netParams) : base(new byte[] { }, 0, true, netParams)
+		public VersionAck(P2PNetworkParameters netParams) : base(new byte[] { }, 0, true, netParams)
 		{
 		}
 
 		// this is needed by the BitcoinSerializer
-		public VersionAck(byte[] payload, P2PNetworkParamaters netParams) : base(payload, 0, true, netParams)
+		public VersionAck(byte[] payload, P2PNetworkParameters netParams) : base(payload, 0, true, netParams)
 		{
 		}
 

@@ -1,8 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
 using Bitcoin.BitcoinUtilities;
 using Bitcoin.Lego.Network;
 using System.IO;
@@ -15,7 +12,7 @@ namespace Bitcoin.Lego.Protocol_Messages
 		public const uint MaxSize = 0x2000000;
 
 		[NonSerialized]
-		private P2PNetworkParamaters _networkParameters;
+		private P2PNetworkParameters _networkParameters;
 
 		[NonSerialized]
 		private int _offset;
@@ -64,14 +61,14 @@ namespace Bitcoin.Lego.Protocol_Messages
 			}
 		}
 
-		internal Message(P2PNetworkParamaters netParams)
+		internal Message(P2PNetworkParameters netParams)
 		{
 			_networkParameters = netParams;
 			_packetMagic = _networkParameters.PacketMagic;
 			_protocolVersion = _networkParameters.ClientVersion;
 		}
 		
-		internal Message(byte[] msg, int offset, bool runParse, P2PNetworkParamaters netParams)
+		internal Message(byte[] msg, int offset, bool runParse, P2PNetworkParameters netParams)
 		{
 			_networkParameters = netParams;
 			_protocolVersion = _networkParameters.ClientVersion;
@@ -108,7 +105,7 @@ namespace Bitcoin.Lego.Protocol_Messages
 			get { return Cursor - Offset; }
 		}
 
-		internal P2PNetworkParamaters P2PNetParameters
+		internal P2PNetworkParameters P2PNetParameters
 		{
 			get
 			{

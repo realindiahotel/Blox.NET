@@ -62,8 +62,9 @@
   </ItemGroup>
   <ItemGroup>
     <Build Include="AddressPool.sql" />
-  </ItemGroup>
-  <ItemGroup>
-    <RefactorLog Include="Lego.NET.Data.refactorlog" />
+    <Build Include="Blocks.sql" />
+    <Build Include="TXs.sql" />
+    <Build Include="TXIns.sql" />
+    <Build Include="TXOuts.sql" />
   </ItemGroup>
 </Project>

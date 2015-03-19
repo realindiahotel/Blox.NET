@@ -16,17 +16,17 @@ namespace Bitcoin.Lego.Protocol_Messages
 
 		internal IList<PeerAddress> Addresses { get; private set; }
 
-		internal AddressMessage(byte[] payload, int offset, P2PNetworkParamaters netParams): base(payload, offset,true,netParams)
+		internal AddressMessage(byte[] payload, int offset, P2PNetworkParameters netParams): base(payload, offset,true,netParams)
 		{
 
 		}
 
-		internal AddressMessage(byte[] payload, P2PNetworkParamaters netParams) : base(payload, 0, true, netParams)
+		internal AddressMessage(byte[] payload, P2PNetworkParameters netParams) : base(payload, 0, true, netParams)
 		{
 
 		}
 
-		internal AddressMessage(List<PeerAddress> payloadAddresses, P2PNetworkParamaters netParams) : base(netParams)
+		internal AddressMessage(List<PeerAddress> payloadAddresses, P2PNetworkParameters netParams) : base(netParams)
 		{
 			Addresses = payloadAddresses;
 		}

@@ -11,11 +11,11 @@ namespace Bitcoin.Lego.Protocol_Messages
 	[Serializable]
 	public class InventoryMessage : ListMessage
 	{
-		public InventoryMessage(byte[] bytes, P2PNetworkParamaters netParams) : base(bytes,netParams)
+		public InventoryMessage(byte[] bytes, P2PNetworkParameters netParams) : base(bytes,netParams)
 		{
 		}
 
-		public InventoryMessage(P2PNetworkParamaters netParams) : base(netParams)
+		public InventoryMessage(P2PNetworkParameters netParams) : base(netParams)
 		{
 		}
 	}

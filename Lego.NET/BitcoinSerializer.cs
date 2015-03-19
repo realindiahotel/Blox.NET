@@ -72,7 +72,7 @@ namespace Bitcoin.Lego
 		/// Reads a message from the given InputStream and returns it.
 		/// </summary>
 		/// <exception cref="IOException"/>
-		public Message Deserialize(Stream @in, P2PNetworkParamaters netParams)
+		public Message Deserialize(Stream @in, P2PNetworkParameters netParams)
 		{
 			// A BitCoin protocol message has the following format.
 			//
@@ -167,7 +167,7 @@ namespace Bitcoin.Lego
 			}
 		}
 
-		private Message MakeMessage(string command, byte[] payloadBytes, P2PNetworkParamaters netParams)
+		private Message MakeMessage(string command, byte[] payloadBytes, P2PNetworkParameters netParams)
 		{
 			// We use an if ladder rather than reflection because reflection can be slow on some platforms.
 			if (command.Equals("version"))
@@ -201,18 +201,18 @@ namespace Bitcoin.Lego
 			if (command.Equals("getaddr"))
 			{
 				return new GetAddresses(payloadBytes, netParams);
-			}/*
+			}
 			if (command.Equals("block"))
 			{
-				return new Block(_params, payloadBytes);
-			}
+				return new BlockMessage(payloadBytes, netParams);
+			}/*
 			if (command.Equals("getdata"))
 			{
 				return new GetDataMessage(_params, payloadBytes);
 			}
 			if (command.Equals("tx"))
 			{
-				return new Transaction(_params, payloadBytes);
+				return new TransactionMessage(_params, payloadBytes);
 			}						
 			*/
 

@@ -32,7 +32,7 @@ namespace Lego.NET.Bipolar
 
 		public async void StarteMe()
 		{
-			P2PNetworkParamaters netParams = new P2PNetworkParamaters(P2PNetworkParamaters.ProtocolVersion, false, 20966, (ulong)P2PNetworkParamaters.NODE_NETWORK.FULL_NODE, (int)P2PNetworkParamaters.RELAY.RELAY_ALWAYS);
+			P2PNetworkParameters netParams = new P2PNetworkParameters(P2PNetworkParameters.ProtocolVersion, false, 20966, (ulong)P2PNetworkParameters.NODE_NETWORK.FULL_NODE, (int)P2PNetworkParameters.RELAY.RELAY_ALWAYS);
 			//start threaded loop listening for peers
 			if (netParams.ListenForPeers)
 			{

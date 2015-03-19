@@ -21,13 +21,23 @@ namespace Bitcoin.Lego.Data_Interface
 	public class DatabaseConnection :IDisposable
 	{
 		//using LocalDB - can be swapped out for other SQL Server derivatives, including AzureDB. If using Azure, beware the rate limiting, keep an eye for resource exceed exceptions if using Azure DB
-		private String _connectionString = @"Data Source=(localdb)\MSSQLLocalDB;Initial Catalog=LegoDB;Integrated Security=True;Connect Timeout=60;Encrypt=False;TrustServerCertificate=False";
+		private String _connectionString;
 		private SqlConnection _sqlConnectionObj;
-		private P2PNetworkParamaters _networkParameters;
+		private P2PNetworkParameters _networkParameters;
 
-		public DatabaseConnection(P2PNetworkParamaters netParams)
+		public DatabaseConnection(P2PNetworkParameters netParams)
 		{
-			_networkParameters = netParams;
+			_networkParameters = netParams;			
+
+			if (_networkParameters.IsTestNet)
+			{
+				_connectionString = @"Data Source = (localdb)\ProjectsV12; Initial Catalog = Lego.Net TestNet DB; Integrated Security = True; Connect Timeout = 30; Encrypt = False; TrustServerCertificate = False";
+			}
+			else
+			{
+				_connectionString= @"Data Source = (localdb)\ProjectsV12;Initial Catalog = Lego.NET DB; Integrated Security = True; Connect Timeout = 30; Encrypt=False;TrustServerCertificate=False";
+			}
+
 			_sqlConnectionObj = new SqlConnection(_connectionString);
 		}
 
@@ -141,13 +151,12 @@ namespace Bitcoin.Lego.Data_Interface
 
 				if (!IsAddressKnown(addressToAdd))
 				{
-					pSanitiseServices(addressToAdd.Services);
-
+					//note SQL server does not have uint and ulong data types, so we use appropriate size decimal type instead and this preserves the full value
 					SqlCommand addAddrCmd = new SqlCommand("INSERT INTO [AddressPool] VALUES (@Param1, @Param2, @Param3, @Param4);", _sqlConnectionObj);
 					addAddrCmd.Parameters.Add(new SqlParameter("@Param1", addressToAdd.IPAddress.ToString()));
-					addAddrCmd.Parameters.Add(new SqlParameter("@Param2", Convert.ToInt32(addressToAdd.Time)));
-					addAddrCmd.Parameters.Add(new SqlParameter("@Param3", Convert.ToInt64(addressToAdd.Services)));
-					addAddrCmd.Parameters.Add(new SqlParameter("@Param4", Convert.ToInt32(addressToAdd.Port)));
+					addAddrCmd.Parameters.Add(new SqlParameter("@Param2", Convert.ToDecimal(addressToAdd.Time)));
+					addAddrCmd.Parameters.Add(new SqlParameter("@Param3", Convert.ToDecimal(addressToAdd.Services)));
+					addAddrCmd.Parameters.Add(new SqlParameter("@Param4", Convert.ToDecimal(addressToAdd.Port)));
 
 					if (addAddrCmd.ExecuteNonQuery() < 1)
 					{
@@ -228,17 +237,14 @@ namespace Bitcoin.Lego.Data_Interface
 				if (!IsOpen)
 				{
 					OpenDBConnection();
-				}
-
-				//deal with weird services
-				pSanitiseServices(addressToUpdate.Services);				
+				}			
 
 				using (SqlCommand updAddrCmd = new SqlCommand("UPDATE [AddressPool] SET [Time]=@Param1, [Services]=@Param2, [Port]=@Param3 WHERE [IPAddress]=@Param4;", _sqlConnectionObj))
 				{
 					updAddrCmd.CommandTimeout = 15000;
-					updAddrCmd.Parameters.Add(new SqlParameter("@Param1", Convert.ToInt32(time)));
-					updAddrCmd.Parameters.Add(new SqlParameter("@Param2", Convert.ToInt64(addressToUpdate.Services)));
-					updAddrCmd.Parameters.Add(new SqlParameter("@Param3", Convert.ToInt32(addressToUpdate.Port)));
+					updAddrCmd.Parameters.Add(new SqlParameter("@Param1", Convert.ToDecimal(time)));
+					updAddrCmd.Parameters.Add(new SqlParameter("@Param2", Convert.ToDecimal(addressToUpdate.Services)));
+					updAddrCmd.Parameters.Add(new SqlParameter("@Param3", Convert.ToDecimal(addressToUpdate.Port)));
 					updAddrCmd.Parameters.Add(new SqlParameter("@Param4", addressToUpdate.IPAddress.ToString()));
 					if (updAddrCmd.ExecuteNonQuery() >= 1)
 					{
@@ -277,15 +283,15 @@ namespace Bitcoin.Lego.Data_Interface
 				using (SqlCommand getAddrCmd = new SqlCommand("SELECT * FROM [AddressPool] WHERE [IPAddress]=@Param1 AND [Port]=@Param2;", _sqlConnectionObj))
 				{
 					getAddrCmd.Parameters.Add(new SqlParameter("@Param1", ip));
-					getAddrCmd.Parameters.Add(new SqlParameter("@Param2", port));
+					getAddrCmd.Parameters.Add(new SqlParameter("@Param2", Convert.ToDecimal(port)));
 
 					using (SqlDataReader dataReader = getAddrCmd.ExecuteReader())
 					{
 
 						if (dataReader.Read())
 						{
-							P2PNetworkParamaters useTheseForAddr = new P2PNetworkParamaters(P2PNetworkParamaters.ProtocolVersion, _networkParameters.IsTestNet, dataReader.GetInt32(3), Convert.ToUInt64(dataReader.GetInt64(2)));
-                            addressToGet = new PeerAddress(IPAddress.Parse(dataReader.GetString(0)), useTheseForAddr.P2PListeningPort, useTheseForAddr.Services, Convert.ToUInt32(dataReader.GetInt32(1)), useTheseForAddr);
+							P2PNetworkParameters useTheseForAddr = new P2PNetworkParameters(P2PNetworkParameters.ProtocolVersion, _networkParameters.IsTestNet, Convert.ToUInt16(dataReader.GetDecimal(3)), Convert.ToUInt64(dataReader.GetDecimal(2)));
+                            addressToGet = new PeerAddress(IPAddress.Parse(dataReader.GetString(0)), useTheseForAddr.P2PListeningPort, useTheseForAddr.Services, Convert.ToUInt32(dataReader.GetDecimal(1)), useTheseForAddr);
 							dataReader.Close();
 							return true;
 						}
@@ -332,8 +338,8 @@ namespace Bitcoin.Lego.Data_Interface
 
 						while(dataReader.Read())
 						{
-							P2PNetworkParamaters netParams = new P2PNetworkParamaters(P2PNetworkParamaters.ProtocolVersion, _networkParameters.IsTestNet, dataReader.GetInt32(3), Convert.ToUInt64(dataReader.GetInt64(2)));
-                            addressesOut.Add(new PeerAddress(IPAddress.Parse(dataReader.GetString(0)), netParams.P2PListeningPort, netParams.Services, Convert.ToUInt32(dataReader.GetInt32(1)),netParams));		
+							P2PNetworkParameters netParams = new P2PNetworkParameters(P2PNetworkParameters.ProtocolVersion, _networkParameters.IsTestNet, Convert.ToUInt16(dataReader.GetDecimal(3)), Convert.ToUInt64(dataReader.GetDecimal(2)));
+                            addressesOut.Add(new PeerAddress(IPAddress.Parse(dataReader.GetString(0)), netParams.P2PListeningPort, netParams.Services, Convert.ToUInt32(dataReader.GetDecimal(1)),netParams));		
 						}
 						dataReader.Close();
 					}
@@ -355,17 +361,6 @@ namespace Bitcoin.Lego.Data_Interface
 			}
 
 			return addressesOut;
-		}
-
-		private ulong pSanitiseServices(ulong services)
-		{
-			//saw some clients with weird big numbers in the service field, I don't trust them so they get treated as SPV nodes.
-			if (services != (ulong)P2PNetworkParamaters.NODE_NETWORK.FULL_NODE && services != (ulong)P2PNetworkParamaters.NODE_NETWORK.SPV_NODE)
-			{
-				services = 0;
-			}
-
-			return services;
 		}
 
 		public String ConnectionString

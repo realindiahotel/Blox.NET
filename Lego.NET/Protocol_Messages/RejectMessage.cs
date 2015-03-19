@@ -61,12 +61,12 @@ namespace Bitcoin.Lego.Protocol_Messages
 			}
 		}
 
-		public RejectMessage(byte[] msg , P2PNetworkParamaters netParams) : base(msg, 0, true, netParams)
+		public RejectMessage(byte[] msg , P2PNetworkParameters netParams) : base(msg, 0, true, netParams)
 		{
 
 		}
 
-		public RejectMessage(string message, ccode ccode, string reason, P2PNetworkParamaters netParams, string data="") :base(netParams)
+		public RejectMessage(string message, ccode ccode, string reason, P2PNetworkParameters netParams, string data="") :base(netParams)
 		{
 			_message = message;
 			_ccode = ccode;

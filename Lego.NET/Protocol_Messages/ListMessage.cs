@@ -20,12 +20,12 @@ namespace Bitcoin.Lego.Protocol_Messages
 		//maximum amount of items as defined in protocol specification
 		private const ulong _maxInventoryItems = 50000;
 
-		protected ListMessage(byte[] bytes, P2PNetworkParamaters netParams) : base(bytes, 0, true, netParams)
+		protected ListMessage(byte[] bytes, P2PNetworkParameters netParams) : base(bytes, 0, true, netParams)
 		{
 
 		}
 
-		protected ListMessage(P2PNetworkParamaters netParams) : base(netParams)
+		protected ListMessage(P2PNetworkParameters netParams) : base(netParams)
 		{
 			_items = new List<InventoryItem>();
 		}

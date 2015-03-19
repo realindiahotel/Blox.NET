@@ -1,4 +1,5 @@
 ﻿using System;
+using Org.BouncyCastle.Math;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -6,12 +7,13 @@ using System.Threading.Tasks;
 
 namespace Bitcoin.Lego.Network
 {
-	public class P2PNetworkParamaters
+	public class P2PNetworkParameters
 	{
 		public const uint TestPacketMagic = 0x0b110907;
         public const uint ProdPacketMagic = 0xf9beb4d9;
-		public const int TestP2PPort = 18333;
-		public const int ProdP2PPort = 8333;
+		public const ushort TestP2PPort = 18333;
+		public const ushort ProdP2PPort = 8333;
+		public static BigInteger ProofOfWorkLimit = new BigInteger("0000000fffffffffffffffffffffffffffffffffffffffffffffffffffffffff", 16);
 		public static readonly String[] DNSSeedHosts = { "seed.bitcoin.sipa.be", "dnsseed.bitcoin.dashjr.org", "bitseed.xf2.org", "dnsseed.bluematt.me" }; //in future lego will also have it's own dns responder
 		public static readonly String[] TestNetDNSSeedHosts = { "testnet-seed.bitcoin.petertodd.org" };
 		public static readonly int MaxOutgoingP2PConnections = 8; //The maximum amount of P2P clients we will reach out and connect to
@@ -31,7 +33,7 @@ namespace Bitcoin.Lego.Network
 		private bool _strictVerackOutbound;	//if true we force reciept of verack from peers we connect to outbound		
 		public enum NODE_NETWORK : ulong { SPV_NODE = 0, FULL_NODE = 1 };
 		public enum RELAY { RELAY_ON_DEMAND = 0, RELAY_ALWAYS = 1 };
-		private int _p2PListeningPort;
+		private ushort _p2PListeningPort;
 		private int _addressMemPoolMax;	//once this value is reached we start overwriting addr entries in the begining of the peers address mempool	
 		private bool _uPNPMapPort; //Attempts to send UPNP message to set up port forwarding in NAT of connected router, won't always work, especially if on VPN or behind multiple routers, but should work for most homes
 		private readonly bool _listenForPeers;	//if this is true we listen for peers on startup
@@ -52,7 +54,7 @@ namespace Bitcoin.Lego.Network
 		/// <param name="advertiseExternalIP">true to broadcast our public IP address to peers, set false if you don't want to broadcast your public IP address</param>
 		/// <param name="allowP2PConnectToSelf">true allows us to connect to ourself</param>
 		/// <param name="enableUPNPPortMap">true attempts to set port forwarding with the closest NAT device using UPnP</param>
-		public P2PNetworkParamaters(uint clientVersion, bool isTestNet = false, int listeningPort = ProdP2PPort, ulong services = (ulong)NODE_NETWORK.FULL_NODE, int relay = (int)RELAY.RELAY_ALWAYS, bool enableListenForPeers = true, bool strictVerackForOutbound = true, bool advertiseExternalIP = true, bool allowP2PConnectToSelf = false, bool enableUPNPPortMap = true, int addressMemPoolMaxSize = 5000)
+		public P2PNetworkParameters(uint clientVersion, bool isTestNet = false, ushort listeningPort = ProdP2PPort, ulong services = (ulong)NODE_NETWORK.FULL_NODE, int relay = (int)RELAY.RELAY_ALWAYS, bool enableListenForPeers = true, bool strictVerackForOutbound = true, bool advertiseExternalIP = true, bool allowP2PConnectToSelf = false, bool enableUPNPPortMap = true, int addressMemPoolMaxSize = 5000)
 		{
 			_isTestNet = isTestNet;
 
@@ -91,7 +93,7 @@ namespace Bitcoin.Lego.Network
 			_addressMemPoolMax = addressMemPoolMaxSize;
 		}
 
-		public int P2PListeningPort
+		public ushort P2PListeningPort
 		{
 			get
 			{

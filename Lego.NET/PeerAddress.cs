@@ -19,7 +19,7 @@ namespace Bitcoin.Lego
 	public class PeerAddress : Message
 	{
 		private IPAddress _addr;
-		private int _port;
+		private ushort _port;
 		private ulong _services;
 		private uint _time;
 		private bool _isInVersionMessage;
@@ -27,7 +27,7 @@ namespace Bitcoin.Lego
 		/// <summary>
 		/// Construct a peer address from a serialized payload.
 		/// </summary>
-		public PeerAddress(byte[] payload, int offset, bool isInVersionMessage, P2PNetworkParamaters netParams):base(payload, offset, false, netParams)
+		public PeerAddress(byte[] payload, int offset, bool isInVersionMessage, P2PNetworkParameters netParams):base(payload, offset, false, netParams)
 		{
 			_isInVersionMessage = isInVersionMessage;
 			Parse();
@@ -36,7 +36,7 @@ namespace Bitcoin.Lego
 		/// <summary>
 		/// Construct a peer address from a memorized or hardcoded address.
 		/// </summary>
-		public PeerAddress(IPAddress addr, int port, ulong services, P2PNetworkParamaters netParams, bool isInVersionMessage = false) :base(netParams)
+		public PeerAddress(IPAddress addr, ushort port, ulong services, P2PNetworkParameters netParams, bool isInVersionMessage = false) :base(netParams)
 		{
 			_addr = addr;
 			_port = port;
@@ -46,7 +46,7 @@ namespace Bitcoin.Lego
 			_isInVersionMessage = isInVersionMessage;
 		}
 
-		public PeerAddress(IPAddress addr, int port, ulong services, uint time, P2PNetworkParamaters netParams, bool isInVersionMessage = false) :base(netParams)
+		public PeerAddress(IPAddress addr, ushort port, ulong services, uint time, P2PNetworkParameters netParams, bool isInVersionMessage = false) :base(netParams)
 		{
 			_addr = addr;
 			_port = port;
@@ -105,7 +105,7 @@ namespace Bitcoin.Lego
 				addrBytes = newBytes;
 			}
 			_addr = new IPAddress(addrBytes);
-			_port = (Bytes[Cursor++] << 8) | Bytes[Cursor++];
+			_port = Convert.ToUInt16((Bytes[Cursor++] << 8) | Bytes[Cursor++]);
 
 			Bytes = null;
 		}
@@ -157,7 +157,7 @@ namespace Bitcoin.Lego
 			}
 		}
 
-		public int Port
+		public ushort Port
 		{
 			get
 			{

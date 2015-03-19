@@ -12,12 +12,12 @@ namespace Bitcoin.Lego.Protocol_Messages
 	public class Pong : Message
 	{
 		private ulong _nonce;
-		public Pong(byte[] payload, P2PNetworkParamaters netParams) : base(payload, 0, true, netParams)
+		public Pong(byte[] payload, P2PNetworkParameters netParams) : base(payload, 0, true, netParams)
 		{
 			
 		}
 
-		public Pong(ulong nonce, P2PNetworkParamaters netParams) : base(netParams)
+		public Pong(ulong nonce, P2PNetworkParameters netParams) : base(netParams)
 		{
 			_nonce = nonce;
 		}

@@ -4,7 +4,6 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using System.ComponentModel;
 using System.Net.Sockets;
 using System.Net;
 using System.IO;
@@ -34,8 +33,8 @@ namespace Bitcoin.Lego.Network
 		private Stream _dataIn;
 		private IPEndPoint _remoteEndPoint;
 		private readonly IPAddress _remoteIp;
-		private readonly int _remotePort;
-		private P2PNetworkParamaters _networkParameters;
+		private readonly ushort _remotePort;
+		private P2PNetworkParameters _networkParameters;
 
 		private readonly BitcoinSerializer _serializer = new BitcoinSerializer();
 
@@ -47,7 +46,7 @@ namespace Bitcoin.Lego.Network
 		/// <param name="socket">The socket to use for the data stream, if we don't have one use new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp)</param>
 		/// <param name="remotePort">The remote port to connect to</param>
 		/// <param name="inbound">Is this an inbount P2P connection or are we connecting out</param>
-		public P2PConnection(IPAddress remoteIp, P2PNetworkParamaters netParams, Socket socket, int remotePort = P2PNetworkParamaters.ProdP2PPort, bool inbound = false)
+		public P2PConnection(IPAddress remoteIp, P2PNetworkParameters netParams, Socket socket, ushort remotePort = P2PNetworkParameters.ProdP2PPort, bool inbound = false)
 		{
 			_inbound = inbound;
 			_networkParameters = netParams;
@@ -60,7 +59,7 @@ namespace Bitcoin.Lego.Network
 			//fully loaded man https://www.youtube.com/watch?v=dLIIKrJ6nnI
 		}
 
-		public bool ConnectToPeer(uint blockHeight, ulong remotePeerServices = (ulong)P2PNetworkParamaters.NODE_NETWORK.FULL_NODE)
+		public bool ConnectToPeer(uint blockHeight, ulong remotePeerServices = (ulong)P2PNetworkParameters.NODE_NETWORK.FULL_NODE)
 		{
 			try
 			{
@@ -71,7 +70,7 @@ namespace Bitcoin.Lego.Network
 				{
 					//check it's not a duplicate connection
 
-					if (P2PConnectionManager.ConnectedToPeer(new PeerAddress(_remoteIp, _remotePort,_networkParameters.Services,new P2PNetworkParamaters(P2PNetworkParamaters.ProtocolVersion,_networkParameters.IsTestNet,_remotePort))))
+					if (P2PConnectionManager.ConnectedToPeer(new PeerAddress(_remoteIp, _remotePort,_networkParameters.Services,new P2PNetworkParameters(P2PNetworkParameters.ProtocolVersion,_networkParameters.IsTestNet,_remotePort))))
 					{
 						throw new Exception("Already Inbound Connection Matching "+ _remoteIp.ToString()+ ":"+_remotePort + " Not Attempting To Connect");
 					}
@@ -115,7 +114,7 @@ namespace Bitcoin.Lego.Network
 				else //the connection is outgoing so we send our version message first
 				{
 					//check it's not a duplicate connection
-					if (P2PConnectionManager.ConnectedToPeer(new PeerAddress(_remoteIp, _remotePort, _networkParameters.Services, new P2PNetworkParamaters(P2PNetworkParamaters.ProtocolVersion, _networkParameters.IsTestNet, _remotePort))))
+					if (P2PConnectionManager.ConnectedToPeer(new PeerAddress(_remoteIp, _remotePort, _networkParameters.Services, new P2PNetworkParameters(P2PNetworkParameters.ProtocolVersion, _networkParameters.IsTestNet, _remotePort))))
 					{
 						throw new Exception("Already Outbound Connection Matching " + _remoteIp.ToString() + ":" + _remotePort + " Not Attempting To Connect");
 					}
@@ -145,25 +144,22 @@ namespace Bitcoin.Lego.Network
 						}
 						else
 						{
+							PeerAddress their_net_addr = new PeerAddress(_remoteIp, _remotePort, _theirVersionMessage.LocalServices, new P2PNetworkParameters(_theirVersionMessage.ClientVersion, _networkParameters.IsTestNet, Convert.ToUInt16(_theirVersionMessage.TheirAddr.Port), _theirVersionMessage.TheirAddr.Services));
+
 							//send addr will also happen every 24 hrs by default
 							_addrFartThread.Start();
+
+							//send the addr of the peer I have just connected too to all other peers as I'm sure they'd like to know about a connectable peer as well :)					
+							BradcastSend(new AddressMessage(new List<PeerAddress>() { their_net_addr }, _networkParameters), new List<P2PConnection>() { this });
 
 							//start listening for messages
 							pMessageListener();
 
-							PeerAddress their_net_addr = new PeerAddress(_remoteIp, _remotePort, _theirVersionMessage.LocalServices, new P2PNetworkParamaters(_theirVersionMessage.ClientVersion, _networkParameters.IsTestNet, _theirVersionMessage.TheirAddr.Port,_theirVersionMessage.TheirAddr.Services));
-
-							//make sure I put their address in the db if it's not in there, because we love to remember peers we can connect to :) *if not testnet
-							if (!_networkParameters.IsTestNet)
+							//make sure I put their address in the db if it's not in there, because we love to remember peers we can connect to :)
+							using (DatabaseConnection dBC = new DatabaseConnection(_networkParameters))
 							{
-								using (DatabaseConnection dBC = new DatabaseConnection(_networkParameters))
-								{
-									dBC.AddAddress(their_net_addr);
-								}
+								dBC.AddAddress(their_net_addr);
 							}
-
-							//send the addr of the peer I have just connected too to all other peers as I'm sure they'd like to know about a connectable peer as well :)					
-							BradcastSend(new AddressMessage(new List<PeerAddress>() { their_net_addr }, _networkParameters), new List<P2PConnection>() { this });
 						}
 
 					}
@@ -210,11 +206,11 @@ namespace Bitcoin.Lego.Network
 			DataIn = new NetworkStream(Socket, FileAccess.Read);
 			DataOut = new NetworkStream(Socket, FileAccess.Write);
 
-			Socket.ReceiveTimeout = P2PNetworkParamaters.HeartbeatTimeout;
+			Socket.ReceiveTimeout = P2PNetworkParameters.HeartbeatTimeout;
 			Socket.SendTimeout = 2000; //2 second timeout for sending messages
 			Socket.SetIPProtectionLevel(IPProtectionLevel.Unrestricted);
 
-			_myVersionMessage = new VersionMessage(_remoteIp, _remotePort, Socket, blockHeight, P2PNetworkParamaters.ProtocolVersion, new P2PNetworkParamaters(_networkParameters.ClientVersion, _networkParameters.IsTestNet,((IPEndPoint)Socket.LocalEndPoint).Port,_networkParameters.Services));
+			_myVersionMessage = new VersionMessage(_remoteIp, _remotePort, Socket, blockHeight, P2PNetworkParameters.ProtocolVersion, new P2PNetworkParameters(_networkParameters.ClientVersion, _networkParameters.IsTestNet,Convert.ToUInt16(((IPEndPoint)Socket.LocalEndPoint).Port),_networkParameters.Services));
 
 			//set thread for heartbeat
 			_heartbeatThread = new Thread(new ThreadStart(pSendHeartbeat));
@@ -243,9 +239,9 @@ namespace Bitcoin.Lego.Network
 			{
 
 				//The client is reporting a version too old for our liking
-				if (_theirVersionMessage.ClientVersion < P2PNetworkParamaters.MinimumAcceptedClientVersion)
+				if (_theirVersionMessage.ClientVersion < P2PNetworkParameters.MinimumAcceptedClientVersion)
 				{
-					Send(new RejectMessage("version", RejectMessage.ccode.REJECT_OBSOLETE, "Client version needs to be at least " + P2PNetworkParamaters.MinimumAcceptedClientVersion,_networkParameters));
+					Send(new RejectMessage("version", RejectMessage.ccode.REJECT_OBSOLETE, "Client version needs to be at least " + P2PNetworkParameters.MinimumAcceptedClientVersion,_networkParameters));
 					return false;
 				}
 				else if (!Utilities.UnixTimeWithin70MinuteThreshold(_theirVersionMessage.Time, out _peerTimeOffset)) //check the unix time timestamp isn't outside 70 minutes, we don't wan't anyone outside 70 minutes anyway....Herpes
@@ -570,7 +566,7 @@ namespace Bitcoin.Lego.Network
 						int getaddrDelay = new Random(Environment.TickCount).Next(500, 5001);
 						Thread.Sleep(getaddrDelay);
 						Send(new GetAddresses(_networkParameters));
-						Thread.Sleep((P2PNetworkParamaters.AddrFartInterval - getaddrDelay));
+						Thread.Sleep((P2PNetworkParameters.AddrFartInterval - getaddrDelay));
 #if (DEBUG)
 						Console.WriteLine("Send Addr Wakes Up");
 #endif
@@ -600,9 +596,9 @@ namespace Bitcoin.Lego.Network
 			{
 				try
 				{
-					Thread.Sleep(P2PNetworkParamaters.HeartbeatTimeout); //send a heartbeat after the specified interval
+					Thread.Sleep(P2PNetworkParameters.HeartbeatTimeout); //send a heartbeat after the specified interval
 
-					if (P2PNetworkParamaters.HeartbeatKeepAlive)
+					if (P2PNetworkParameters.HeartbeatKeepAlive)
 					{
 						Send(new Ping(_networkParameters));
 
@@ -777,7 +773,7 @@ namespace Bitcoin.Lego.Network
 			{
 				int attempt = 1;
 
-				while (attempt <= P2PNetworkParamaters.RetrySendTCPOnError)
+				while (attempt <= P2PNetworkParameters.RetrySendTCPOnError)
 				{
 					try
 					{
@@ -819,7 +815,7 @@ namespace Bitcoin.Lego.Network
 			{
 				int attempt = 1;
 
-				while (attempt <= P2PNetworkParamaters.RetryRecieveTCPOnError)
+				while (attempt <= P2PNetworkParameters.RetryRecieveTCPOnError)
 				{
 					try
 					{
@@ -1016,7 +1012,7 @@ namespace Bitcoin.Lego.Network
 				}
 			}
 			//when all else fails just return localhost
-			return new PeerAddress(IPAddress.Parse("127.0.0.1"), P2PNetworkParamaters.ProdP2PPort, (ulong)P2PNetworkParamaters.NODE_NETWORK.SPV_NODE, new P2PNetworkParamaters(P2PNetworkParamaters.ProtocolVersion, _networkParameters.IsTestNet));
+			return new PeerAddress(IPAddress.Parse("127.0.0.1"), P2PNetworkParameters.ProdP2PPort, (ulong)P2PNetworkParameters.NODE_NETWORK.SPV_NODE, new P2PNetworkParameters(P2PNetworkParameters.ProtocolVersion, _networkParameters.IsTestNet));
 		}
 
 		public PeerAddress GetMyExternalIP()
@@ -1094,7 +1090,7 @@ namespace Bitcoin.Lego.Network
 				}
 			}
 			//when all else fails just return localhost
-			return new PeerAddress(IPAddress.Parse("127.0.0.1"), _networkParameters.P2PListeningPort, _networkParameters.Services, new P2PNetworkParamaters(P2PNetworkParamaters.ProtocolVersion,_networkParameters.IsTestNet));
+			return new PeerAddress(IPAddress.Parse("127.0.0.1"), _networkParameters.P2PListeningPort, _networkParameters.Services, new P2PNetworkParameters(P2PNetworkParameters.ProtocolVersion,_networkParameters.IsTestNet));
 
 			//'Live Wire' - https://soundcloud.com/excision/live-wire
 		}
@@ -1255,7 +1251,7 @@ namespace Bitcoin.Lego.Network
 			}
 		}
 
-		public P2PNetworkParamaters NetworkParameters
+		public P2PNetworkParameters NetworkParameters
 		{
 			get
 			{

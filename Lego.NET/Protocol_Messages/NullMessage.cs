@@ -12,7 +12,7 @@ namespace Bitcoin.Lego.Protocol_Messages
 	/// </summary>
 	public class NullMessage :Message
 	{
-		public NullMessage(P2PNetworkParamaters netParams) :base(netParams)
+		public NullMessage(P2PNetworkParameters netParams) :base(netParams)
 		{
 
 		}

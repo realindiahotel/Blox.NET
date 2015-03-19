@@ -59,9 +59,10 @@
     <Compile Include="Data_Interface\DatabaseConnection.cs" />
     <Compile Include="Network\HardSeedList.cs" />
     <Compile Include="InventoryItem.cs" />
-    <Compile Include="Network\P2PNetworkParamaters.cs" />
+    <Compile Include="Network\P2PNetworkParameters.cs" />
     <Compile Include="Network\P2PConnectionManager.cs" />
     <Compile Include="Protocol_Messages\AddressMessage.cs" />
+    <Compile Include="Protocol_Messages\BlockMessage.cs" />
     <Compile Include="Protocol_Messages\GetAddresses.cs" />
     <Compile Include="Protocol_Messages\InventoryMessage.cs" />
     <Compile Include="Protocol_Messages\ListMessage.cs" />
@@ -73,6 +74,7 @@
     <Compile Include="Protocol_Messages\Pong.cs" />
     <Compile Include="Protocol_Messages\Ping.cs" />
     <Compile Include="Protocol_Messages\RejectMessage.cs" />
+    <Compile Include="Protocol_Messages\TransactionMessage.cs" />
     <Compile Include="Protocol_Messages\VersionAck.cs" />
     <Compile Include="Protocol_Messages\VersionMessage.cs" />
   </ItemGroup>

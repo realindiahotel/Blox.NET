@@ -1,9 +1,9 @@
 ﻿CREATE TABLE [dbo].[AddressPool]
 (
 	[IPAddress] VARCHAR(45) NOT NULL PRIMARY KEY, 
-    [Time] INT NOT NULL, 
-    [Services] BIGINT NOT NULL, 
-    [Port] INT NOT NULL
+    [Time] DECIMAL(10) NOT NULL, 
+    [Services] DECIMAL(20) NOT NULL, 
+    [Port] DECIMAL(5) NOT NULL
 )
 
 GO
