@@ -1,0 +1,102 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="14.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{4A276366-B28E-4C71-829E-95641022C243}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>Bitcoin.Blox</RootNamespace>
+    <AssemblyName>Blox</AssemblyName>
+    <TargetFrameworkVersion>v4.5.1</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <TargetFrameworkProfile />
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="Accessibility" />
+    <Reference Include="BouncyCastle.Crypto, Version=1.7.4771.41295, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>ExternalDLLs\BouncyCastle.Crypto.dll</HintPath>
+    </Reference>
+    <Reference Include="HtmlAgilityPack">
+      <HintPath>..\packages\HtmlAgilityPack.1.4.9\lib\Net45\HtmlAgilityPack.dll</HintPath>
+    </Reference>
+    <Reference Include="Open.Nat, Version=1.0.0.0, Culture=neutral, PublicKeyToken=f22a6a4582336c76, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>ExternalDLLs\Open.Nat.dll</HintPath>
+    </Reference>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Net.Http" />
+    <Reference Include="System.Net.Http.WebRequest" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="BitcoinSerializer.cs" />
+    <Compile Include="Data_Interface\DatabaseConnection.cs" />
+    <Compile Include="Network\HardSeedList.cs" />
+    <Compile Include="InventoryItem.cs" />
+    <Compile Include="Network\P2PNetworkParameters.cs" />
+    <Compile Include="Network\P2PConnectionManager.cs" />
+    <Compile Include="Protocol_Messages\AddressMessage.cs" />
+    <Compile Include="Protocol_Messages\BlockMessage.cs" />
+    <Compile Include="Protocol_Messages\GetAddresses.cs" />
+    <Compile Include="Protocol_Messages\InventoryMessage.cs" />
+    <Compile Include="Protocol_Messages\ListMessage.cs" />
+    <Compile Include="Protocol_Messages\Message.cs" />
+    <Compile Include="Network\P2PConnection.cs" />
+    <Compile Include="PeerAddress.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Protocol_Messages\NullMessage.cs" />
+    <Compile Include="Protocol_Messages\Pong.cs" />
+    <Compile Include="Protocol_Messages\Ping.cs" />
+    <Compile Include="Protocol_Messages\RejectMessage.cs" />
+    <Compile Include="Protocol_Messages\TransactionMessage.cs" />
+    <Compile Include="Protocol_Messages\VersionAck.cs" />
+    <Compile Include="Protocol_Messages\VersionMessage.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="ExternalDLLs\BouncyCastle.Crypto.dll" />
+    <Content Include="ExternalDLLs\Open.Nat.dll" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\BitcoinUtilities.NET\BitcoinUtilities.NET\BitcoinUtilities.NET\BitcoinUtilities.NET.csproj">
+      <Project>{e054c08c-8b6e-4767-999b-f7de5f8a1e94}</Project>
+      <Name>BitcoinUtilities.NET</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="packages.config" />
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  -->
+</Project>

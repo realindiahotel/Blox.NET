@@ -17,10 +17,10 @@ using System.Threading;
 using System.ComponentModel;
 using System.Collections.ObjectModel;
 using System.Net;
-using Bitcoin.Lego;
-using Bitcoin.Lego.Network;
+using Bitcoin.Blox;
+using Bitcoin.Blox.Network;
 using Bitcoin.BitcoinUtilities;
-using Bitcoin.Lego.Data_Interface;
+using Bitcoin.Blox.Data_Interface;
 using System.Net.Sockets;
 
 namespace TestUI
@@ -110,7 +110,7 @@ namespace TestUI
 
 		private void button3_Click(object sender, RoutedEventArgs e)
 		{
-			p2p.Send(new Bitcoin.Lego.Protocol_Messages.Ping(_networkParameters));
+			p2p.Send(new Bitcoin.Blox.Protocol_Messages.Ping(_networkParameters));
 		}
 
 		private async void button4_Click(object sender, RoutedEventArgs e)

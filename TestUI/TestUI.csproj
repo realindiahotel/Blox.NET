@@ -103,10 +103,6 @@
       <Project>{e054c08c-8b6e-4767-999b-f7de5f8a1e94}</Project>
       <Name>BitcoinUtilities.NET</Name>
     </ProjectReference>
-    <ProjectReference Include="..\Lego.NET\Lego.NET.csproj">
-      <Project>{4a276366-b28e-4c71-829e-95641022c243}</Project>
-      <Name>Lego.NET</Name>
-    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
