@@ -79,7 +79,7 @@
     <Compile Include="HttpInterfaceService.Designer.cs">
       <DependentUpon>HttpInterfaceService.cs</DependentUpon>
     </Compile>
-    <Compile Include="LegoManagementController.cs" />
+    <Compile Include="BloxManagementController.cs" />
     <Compile Include="NodeHostService.cs">
       <SubType>Component</SubType>
     </Compile>
