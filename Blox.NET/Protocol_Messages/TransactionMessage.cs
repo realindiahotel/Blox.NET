@@ -75,66 +75,6 @@ namespace Bitcoin.Blox.Protocol_Messages
 			get { return Hash.ToString(); }
 		}
 
-		internal bool DisconnectInputs()
-		{
-			var disconnected = false;
-			foreach (var input in _inputs)
-			{
-				disconnected |= input.Disconnect();
-			}
-			return disconnected;
-		}
-
-		/// <summary>
-		/// Connects all inputs using the provided transactions. If any input cannot be connected returns that input or
-		/// null on success.
-		/// </summary>
-		internal TransactionInput ConnectForReorganize(IDictionary<Sha256Hash, Transaction> transactions)
-		{
-			foreach (var input in _inputs)
-			{
-				// Coinbase transactions, by definition, do not have connectable inputs.
-				if (input.IsCoinBase) continue;
-				var result = input.Connect(transactions, false);
-				// Connected to another tx in the wallet?
-				if (result == TransactionInput.ConnectionResult.Success)
-					continue;
-				// The input doesn't exist in the wallet, eg because it belongs to somebody else (inbound spend).
-				if (result == TransactionInput.ConnectionResult.NoSuchTx)
-					continue;
-				// Could not connect this input, so return it and abort.
-				return input;
-			}
-			return null;
-		}
-
-		/// <returns>true if every output is marked as spent.</returns>
-		public bool IsEveryOutputSpent()
-		{
-			foreach (var output in _outputs)
-			{
-				if (output.IsAvailableForSpending)
-					return false;
-			}
-			return true;
-		}
-
-		/// <summary>
-		/// These constants are a part of a scriptSig signature on the inputs. They define the details of how a
-		/// transaction can be redeemed, specifically, they control how the hash of the transaction is calculated.
-		/// </summary>
-		/// <remarks>
-		/// In the official client, this enum also has another flag, SIGHASH_ANYONECANPAY. In this implementation,
-		/// that's kept separate. Only SIGHASH_ALL is actually used in the official client today. The other flags
-		/// exist to allow for distributed contracts.
-		/// </remarks>
-		public enum SigHash
-		{
-			All, // 1
-			None, // 2
-			Single,	// 3
-		}
-
 		/// <exception cref="ProtocolException"/>
 		protected override void Parse()
 		{
@@ -144,7 +84,7 @@ namespace Bitcoin.Blox.Protocol_Messages
 			_inputs = new List<TransactionInput>((int)numInputs);
 			for (var i = 0UL; i < numInputs; i++)
 			{
-				var input = new TransactionInput(Params, this, Bytes, Cursor);
+				var input = new TransactionInput(this, Bytes, Cursor, P2PNetParameters);
 				_inputs.Add(input);
 				Cursor += input.MessageSize;
 			}
@@ -153,7 +93,7 @@ namespace Bitcoin.Blox.Protocol_Messages
 			_outputs = new List<TransactionOutput>((int)numOutputs);
 			for (var i = 0UL; i < numOutputs; i++)
 			{
-				var output = new TransactionOutput(Params, this, Bytes, Cursor);
+				var output = new TransactionOutput(this, Bytes, Cursor, P2PNetParameters);
 				_outputs.Add(output);
 				Cursor += output.MessageSize;
 			}
@@ -171,66 +111,6 @@ namespace Bitcoin.Blox.Protocol_Messages
 			get { return _inputs[0].IsCoinBase; }
 		}
 
-		/// <returns>A human readable version of the transaction useful for debugging.</returns>
-		public override string ToString()
-		{
-			var s = new StringBuilder();
-			s.Append("  ");
-			s.Append(HashAsString);
-			s.AppendLine();
-			if (IsCoinBase)
-			{
-				string script;
-				string script2;
-				try
-				{
-					script = _inputs[0].ScriptSig.ToString();
-					script2 = _outputs[0].ScriptPubKey.ToString();
-				}
-				catch (ScriptException)
-				{
-					script = "???";
-					script2 = "???";
-				}
-				return "     == COINBASE TXN (scriptSig " + script + ")  (scriptPubKey " + script2 + ")";
-			}
-			foreach (var @in in _inputs)
-			{
-				s.Append("     ");
-				s.Append("from ");
-
-				try
-				{
-					s.Append(@in.ScriptSig.FromAddress.ToString());
-				}
-				catch (Exception e)
-				{
-					s.Append("[exception: ").Append(e.Message).Append("]");
-					throw;
-				}
-				s.AppendLine();
-			}
-			foreach (var @out in _outputs)
-			{
-				s.Append("       ");
-				s.Append("to ");
-				try
-				{
-					var toAddr = new Address(Params, @out.ScriptPubKey.PubKeyHash);
-					s.Append(toAddr.ToString());
-					s.Append(" ");
-					s.Append(Utilities.BitcoinValueToFriendlyString(@out.Value));
-					s.Append(" BTC");
-				}
-				catch (Exception e)
-				{
-					s.Append("[exception: ").Append(e.Message).Append("]");
-				}
-				s.AppendLine();
-			}
-			return s.ToString();
-		}
-
 		/// <summary>
 		/// Adds an input to this transaction that imports value from the given output. Note that this input is NOT
 		/// complete and after every input is added with addInput() and every output is added with addOutput(),
@@ -239,7 +119,7 @@ namespace Bitcoin.Blox.Protocol_Messages
 		/// </summary>
 		public void AddInput(TransactionOutput from)
 		{
-			AddInput(new TransactionInput(Params, this, from));
+			AddInput(new TransactionInput(this,from.ReadHash(), from.Index, P2PNetParameters));
 		}
 
 		/// <summary>
@@ -259,103 +139,22 @@ namespace Bitcoin.Blox.Protocol_Messages
 			_outputs.Add(to);
 		}
 
-		/// <summary>
-		/// Once a transaction has some inputs and outputs added, the signatures in the inputs can be calculated. The
-		/// signature is over the transaction itself, to prove the redeemer actually created that transaction,
-		/// so we have to do this step last.
-		/// </summary>
-		/// <remarks>
-		/// This method is similar to SignatureHash in script.cpp
-		/// </remarks>
-		/// <param name="hashType">This should always be set to SigHash.ALL currently. Other types are unused. </param>
-		/// <param name="wallet">A wallet is required to fetch the keys needed for signing.</param>
-		/// <exception cref="ScriptException"/>
-		public void SignInputs(SigHash hashType, Wallet wallet)
-		{
-			Debug.Assert(_inputs.Count > 0);
-			Debug.Assert(_outputs.Count > 0);
-
-			// I don't currently have an easy way to test other modes work, as the official client does not use them.
-			Debug.Assert(hashType == SigHash.All);
-
-			// The transaction is signed with the input scripts empty except for the input we are signing. In the case
-			// where addInput has been used to set up a new transaction, they are already all empty. The input being signed
-			// has to have the connected OUTPUT program in it when the hash is calculated!
-			//
-			// Note that each input may be claiming an output sent to a different key. So we have to look at the outputs
-			// to figure out which key to sign with.
-
-			var signatures = new byte[_inputs.Count][];
-			var signingKeys = new EcKey[_inputs.Count];
-			for (var i = 0; i < _inputs.Count; i++)
-			{
-				var input = _inputs[i];
-				Debug.Assert(input.ScriptBytes.Length == 0, "Attempting to sign a non-fresh transaction");
-				// Set the input to the script of its output.
-				input.ScriptBytes = input.Outpoint.ConnectedPubKeyScript;
-				// Find the signing key we'll need to use.
-				var connectedPubKeyHash = input.Outpoint.ConnectedPubKeyHash;
-				var key = wallet.FindKeyFromPubHash(connectedPubKeyHash);
-				// This assert should never fire. If it does, it means the wallet is inconsistent.
-				Debug.Assert(key != null, "Transaction exists in wallet that we cannot redeem: " + Utilities.BytesToHexString(connectedPubKeyHash));
-				// Keep the key around for the script creation step below.
-				signingKeys[i] = key;
-				// The anyoneCanPay feature isn't used at the moment.
-				const bool anyoneCanPay = false;
-				var hash = HashTransactionForSignature(hashType, anyoneCanPay);
-				// Set the script to empty again for the next input.
-				input.ScriptBytes = TransactionInput.EmptyArray;
-
-				// Now sign for the output so we can redeem it. We use the keypair to sign the hash,
-				// and then put the resulting signature in the script along with the public key (below).
-				using (var bos = new MemoryStream())
-				{
-					bos.Write(key.Sign(hash));
-					bos.Write((byte)(((int)hashType + 1) | (anyoneCanPay ? 0x80 : 0)));
-					signatures[i] = bos.ToArray();
-				}
-			}
-
-			// Now we have calculated each signature, go through and create the scripts. Reminder: the script consists of
-			// a signature (over a hash of the transaction) and the complete public key needed to sign for the connected
-			// output.
-			for (var i = 0; i < _inputs.Count; i++)
-			{
-				var input = _inputs[i];
-				Debug.Assert(input.ScriptBytes.Length == 0);
-				var key = signingKeys[i];
-				input.ScriptBytes = Script.CreateInputScript(signatures[i], key.PubKey);
-			}
-
-			// Every input is now complete.
-		}
-
-		private byte[] HashTransactionForSignature(SigHash type, bool anyoneCanPay)
-		{
-			using (var bos = new MemoryStream())
-			{
-				BitcoinSerializeToStream(bos);
-				// We also have to write a hash type.
-				var hashType = (uint)type + 1;
-				if (anyoneCanPay)
-					hashType |= 0x80;
-				Utilities.Uint32ToByteStreamLe(hashType, bos);
-				// Note that this is NOT reversed to ensure it will be signed correctly. If it were to be printed out
-				// however then we would expect that it is IS reversed.
-				return Utilities.DoubleDigest(bos.ToArray());
-			}
-		}
-
-		/// <exception cref="IOException"/>
 		public override void BitcoinSerializeToStream(Stream stream)
 		{
 			Utilities.Uint32ToByteStreamLe(_version, stream);
-			stream.Write(new VarInt((ulong)_inputs.Count).Encode());
-			foreach (var @in in _inputs)
-				@in.BitcoinSerializeToStream(stream);
-			stream.Write(new VarInt((ulong)_outputs.Count).Encode());
-			foreach (var @out in _outputs)
-				@out.BitcoinSerializeToStream(stream);
+            Byte[] inputCountBytes = new VarInt((ulong)_inputs.Count).Encode();
+            stream.Write(inputCountBytes,0,inputCountBytes.Length);
+            foreach (var @in in _inputs)
+            {
+                @in.BitcoinSerializeToStream(stream);
+            }
+
+            Byte[] outputCountBytes = new VarInt((ulong)_outputs.Count).Encode();
+            stream.Write(outputCountBytes, 0 ,outputCountBytes.Length);
+            foreach (var @out in _outputs)
+            {
+                @out.BitcoinSerializeToStream(stream);
+            }
 			Utilities.Uint32ToByteStreamLe(_lockTime, stream);
 		}
 

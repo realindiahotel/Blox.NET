@@ -31,7 +31,7 @@ namespace TestUI
 	public partial class MainWindow : Window
 	{
 		P2PConnection p2p;
-		P2PNetworkParameters _networkParameters = new P2PNetworkParameters(P2PNetworkParameters.ProtocolVersion, false, 20966,1,1,true,true);
+		P2PNetworkParameters _networkParameters = new P2PNetworkParameters(P2PNetworkParameters.ProtocolVersion, false, 22122,1,1,true,true);
 
 		public MainWindow()
 		{

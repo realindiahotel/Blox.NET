@@ -42,26 +42,23 @@ namespace Bitcoin.Blox.Protocol_Messages
 		/// <summary>
 		/// Special case constructor, used for the genesis node, cloneAsHeader and unit tests.
 		/// </summary>
-		internal BlockMessage(P2PNetworkParameters netParams)
-			: base(netParams)
+		internal BlockMessage(P2PNetworkParameters netParams): base(netParams)
 		{
 			// Set up a few basic things. We are not complete after this though.
 			_version = 1;
 			_difficultyTarget = 0x1d07fff8;
 			_time = (uint)P2PConnectionManager.GetUTCNowWithOffset();
-			//_prevBlockHash = Sha256Hash.ZeroHash;
-		}
+            _prevBlockHash = new byte[32];
+        }
 
 		/// <summary>
 		/// Constructs a block object from the BitCoin wire format.
 		/// </summary>
 		/// <exception cref="ProtocolException"/>
-		public BlockMessage(byte[] payloadBytes, P2PNetworkParameters netParams)
-			: base(payloadBytes, 0, true,netParams)
+		public BlockMessage(byte[] payloadBytes, P2PNetworkParameters netParams): base(payloadBytes, 0, true,netParams)
 		{
 		}
 
-		/// <exception cref="ProtocolException"/>
 		protected override void Parse()
 		{
 			_version = ReadUint32();
@@ -89,7 +86,6 @@ namespace Bitcoin.Blox.Protocol_Messages
 			}
 		}
 
-		/// <exception cref="IOException"/>
 		private void WriteHeader(Stream stream)
 		{
 			Utilities.Uint32ToByteStreamLe(_version, stream);
@@ -118,7 +114,7 @@ namespace Bitcoin.Blox.Protocol_Messages
 		/// <summary>
 		/// Calculates the block hash by serializing the block and hashing the resulting bytes.
 		/// </summary>
-		private Byte[] CalculateHash()
+		private Byte[] pCalculateHash()
 		{
 			using (var bos = new MemoryStream())
 			{
@@ -129,7 +125,7 @@ namespace Bitcoin.Blox.Protocol_Messages
 
 		/// <summary>
 		/// Returns the hash of the block (which for a valid, solved block should be below the target) in the form seen
-		/// on the block explorer. If you call this on block 1 in the production chain, you will get
+		/// on the block explorer. If you call this on block 0 in the production chain, you will get
 		/// "00000000839a8e6886ab5951d76f411475428afc90947ee320161bbf18eb6048".
 		/// </summary>
 		public string HashAsString
@@ -142,7 +138,7 @@ namespace Bitcoin.Blox.Protocol_Messages
 		/// </summary>
 		public Byte[] Hash
 		{
-			get { return _hash ?? (_hash = CalculateHash()); }
+			get { return _hash ?? (_hash = pCalculateHash()); }
 		}
 
 		/// <summary>
@@ -219,9 +215,9 @@ namespace Bitcoin.Blox.Protocol_Messages
 			while (true)
 			{
 				// Is our proof of work valid yet?
-				if (CheckProofOfWork(false)) return;
+				if (pCheckProofOfWork()) return;
 				// No, so increment the nonce and try again.
-				Nonce++;
+				_nonce++;
 			}
 		}
 
@@ -243,7 +239,7 @@ namespace Bitcoin.Blox.Protocol_Messages
 		/// Returns true if the hash of the block is OK (lower than difficulty target).
 		/// </summary>
 		/// <exception cref="VerificationException"/>
-		private bool CheckProofOfWork(bool throwException)
+		private bool pCheckProofOfWork()
 		{
 			// This part is key - it is what proves the block was as difficult to make as it claims
 			// to be. Note however that in the context of this function, the block can claim to be
@@ -258,34 +254,46 @@ namespace Bitcoin.Blox.Protocol_Messages
 			var h = Utilities.NewPositiveBigInteger(Hash);
 			if (h.CompareTo(target) > 0)
 			{
-				// Proof of work check failed!
-				if (throwException)
-					throw new Exception("Hash is higher than target: " + HashAsString + " vs " +
-													target.ToString(16));
-				return false;
+                // Proof of work check failed!
+#if(DEBUG)
+                Console.WriteLine("Hash is higher than target: " + HashAsString + " vs " + target.ToString(16));
+#endif
+                return false;
 			}
 			return true;
 		}
 
 
-		private void CheckTimestamp()
+		private bool pCheckTimestamp()
 		{
-			// Allow injection of a fake clock to allow unit testing.
 			var currentTime = P2PConnectionManager.GetUTCNowWithOffset();
 			if (_time > currentTime + _allowedTimeDrift)
-				throw new Exception("Block too far in future");
+            {
+#if(DEBUG)
+                Console.WriteLine("Block too far in future");
+#endif
+                return false;
+            }
+
+            return true;
 		}
 
-		private void CheckMerkleRoot()
+		private bool pCheckMerkleRoot()
 		{
-			var calculatedRoot = CalculateMerkleRoot();
+			var calculatedRoot = pCalculateMerkleRoot();
+
 			if (!calculatedRoot.Equals(_merkleRoot))
 			{
-				throw new Exception("Merkle hashes do not match: " + calculatedRoot + " vs " + _merkleRoot);
-			}
-		}
+#if (DEBUG)
+                Console.WriteLine("Merkle hashes do not match: " + calculatedRoot + " vs " + _merkleRoot); ;
+#endif
+                return false;
+            }
 
-		private Byte[] CalculateMerkleRoot()
+            return true;
+        }
+
+		private Byte[] pCalculateMerkleRoot()
 		{
 			var tree = BuildMerkleTree();
 			return tree[tree.Count - 1];
@@ -300,7 +308,7 @@ namespace Bitcoin.Blox.Protocol_Messages
 			//            /  \
 			//          A      B
 			//         / \    / \
-			//       t1 t2  t3 t4
+			//       t1   t2 t3  t4
 			//
 			// The tree is represented as a list: t1,t2,t3,t4,A,B,root where each entry is a hash.
 			//
@@ -308,21 +316,19 @@ namespace Bitcoin.Blox.Protocol_Messages
 			// transaction. The interior nodes are hashes of the concentration of the two child hashes.
 			//
 			// This structure allows the creation of proof that a transaction was included into a block without having to
-			// provide the full block contents. Instead, you can provide only a Merkle branch. For example to prove tx2 was
-			// in a block you can just provide tx2, the hash(tx1) and B. Now the other party has everything they need to
-			// derive the root, which can be checked against the block header. These proofs aren't used right now but
-			// will be helpful later when we want to download partial block contents.
+			// provide the full block contents. Instead, you can provide only a Merkle branch. For example to prove t2 was
+			// in a block you can just provide t2, the hash(t1) and B. Now the other party has everything they need to
+			// derive the root, which can be checked against the block header.
 			//
-			// Note that if the number of transactions is not even the last tx is repeated to make it so (see
-			// tx3 above). A tree with 5 transactions would look like this:
+			// Note that if the number of transactions is not even the last tx is repeated to make it so. A tree with 5 transactions would look like this:
 			//
 			//                root
-			//                /  \
-			//              1     \
-			//            /  \     \
-			//          2     3     4
-			//         / \   / \   /  \
-			//       t1 t2  t3 t4  t5 t5
+			//                /   \
+			//              1      \
+			//            /   \     \
+			//          2      3     4
+			//         / \    / \   /  \
+			//       t1   t2 t3  t4 t5  t5
 			var tree = new List<byte[]>();
 			// Start by adding all the hashes of the transactions as leaves of the tree.
 			foreach (var t in Transactions)
@@ -349,18 +355,29 @@ namespace Bitcoin.Blox.Protocol_Messages
 			return tree;
 		}
 
-		/// <exception cref="VerificationException"/>
-		private void CheckTransactions()
+		private bool pCheckTransactions()
 		{
-			// The first transaction in a block must always be a coinbase transaction.
-			if (!Transactions[0].IsCoinBase)
-				throw new Exception("First tx is not coinbase");
+            // The first transaction in a block must always be a coinbase transaction.
+            if (!Transactions[0].IsCoinBase)
+            {
+#if(DEBUG)
+               Console.WriteLine("First tx is not coinbase");
+#endif
+                return false;
+            }
 			// The rest must not be.
 			for (var i = 1; i < Transactions.Count; i++)
 			{
-				if (Transactions[i].IsCoinBase)
-					throw new Exception("TX " + i + " is coinbase when it should not be.");
+                if (Transactions[i].IsCoinBase)
+                {
+#if (DEBUG)
+                    Console.WriteLine("TX " + i + " is coinbase when it should not be.");
+#endif
+                    return false;
+                }
 			}
+
+            return true;
 		}
 
 		/// <summary>
@@ -369,22 +386,29 @@ namespace Bitcoin.Blox.Protocol_Messages
 		/// <b>not</b> everything that is required for a block to be valid, only what is checkable independent of the
 		/// chain and without a transaction index.
 		/// </summary>
-		/// <exception cref="VerificationException"/>
-		public void VerifyHeader()
+		private bool pVerifyHeader()
 		{
-			// Prove that this block is OK. It might seem that we can just ignore most of these checks given that the
-			// network is also verifying the blocks, but we cannot as it'd open us to a variety of obscure attacks.
-			//
-			// Firstly we need to ensure this block does in fact represent real work done. If the difficulty is high
-			// enough, it's probably been done by the network.
-			CheckProofOfWork(true);
-			CheckTimestamp();
+            // Prove that this block is OK. It might seem that we can just ignore most of these checks given that the
+            // network is also verifying the blocks, but we cannot as it'd open us to a variety of obscure attacks.
+            //
+            // Firstly we need to ensure this block does in fact represent real work done. If the difficulty is high
+            // enough, it's probably been done by the network.
+            if (pCheckProofOfWork())
+            {
+                return pCheckTimestamp();
+            }
+            else
+            {
+#if(DEBUG)
+                return false;
+#endif
+            }
 		}
 
 		/// <summary>
 		/// Checks the block contents
 		/// </summary>
-		public void VerifyTransactions()
+		private bool pVerifyTransactions()
 		{
 			// Now we need to check that the body of the block actually matches the headers. The network won't generate
 			// an invalid block, but if we didn't validate this then an untrusted man-in-the-middle could obtain the next
@@ -392,18 +416,33 @@ namespace Bitcoin.Blox.Protocol_Messages
 			// transactions that reference spent or non-existant inputs.
 			if (Transactions.Count > 0)
 			{
-				CheckTransactions();
-				CheckMerkleRoot();
+                if (pCheckTransactions())
+                {
+                    return pCheckMerkleRoot();
+                }
+                else
+                {
+
+                    return false;
+                }
 			}
+
+            return true;
 		}
 
 		/// <summary>
 		/// Verifies both the header and that the transactions hash to the merkle root.
 		/// </summary>
-		public void Verify()
+		public bool Verify()
 		{
-			VerifyHeader();
-			VerifyTransactions();
+            if (pVerifyHeader())
+            {
+                return pVerifyTransactions();
+            }
+            else
+            {
+                return false;
+            }
 		}
 
 		public override bool Equals(object o)
@@ -425,7 +464,7 @@ namespace Bitcoin.Blox.Protocol_Messages
 		{
 			get
 			{
-				return _merkleRoot ?? (_merkleRoot = CalculateMerkleRoot());
+				return _merkleRoot ?? (_merkleRoot = pCalculateMerkleRoot());
 			}			
 		}
 
@@ -449,7 +488,10 @@ namespace Bitcoin.Blox.Protocol_Messages
 		/// </summary>
 		public long Version
 		{
-			get { return _version; }
+			get
+            {
+                return _version;
+            }
 		}
 
 		/// <summary>
@@ -457,12 +499,10 @@ namespace Bitcoin.Blox.Protocol_Messages
 		/// </summary>
 		public Byte[] PrevBlockHash
 		{
-			get { return _prevBlockHash; }
-			internal set
-			{
-				_prevBlockHash = value;
-				_hash = null;
-			}
+			get
+            {
+                return _prevBlockHash;
+            }
 		}
 
 		/// <summary>
@@ -471,12 +511,10 @@ namespace Bitcoin.Blox.Protocol_Messages
 		/// </summary>
 		public uint TimeSeconds
 		{
-			get { return _time; }
-			set
-			{
-				_time = value;
-				_hash = null;
-			}
+			get
+            {
+                return _time;
+            }
 		}
 
 		/// <summary>
@@ -486,12 +524,10 @@ namespace Bitcoin.Blox.Protocol_Messages
 		/// </summary>
 		public uint DifficultyTarget
 		{
-			get { return _difficultyTarget; }
-			internal set
-			{
-				_difficultyTarget = value;
-				_hash = null;
-			}
+			get
+            {
+                return _difficultyTarget;
+            }
 		}
 
 		/// <summary>
@@ -500,12 +536,10 @@ namespace Bitcoin.Blox.Protocol_Messages
 		/// </summary>
 		public uint Nonce
 		{
-			get { return _nonce; }
-			internal set
-			{
-				_nonce = value;
-				_hash = null;
-			}
+			get
+            {
+                return _nonce;
+            }
 		}
 	}
 }

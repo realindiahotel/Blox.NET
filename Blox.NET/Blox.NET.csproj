@@ -74,7 +74,9 @@
     <Compile Include="Protocol_Messages\Pong.cs" />
     <Compile Include="Protocol_Messages\Ping.cs" />
     <Compile Include="Protocol_Messages\RejectMessage.cs" />
+    <Compile Include="Protocol_Messages\TransactionInput.cs" />
     <Compile Include="Protocol_Messages\TransactionMessage.cs" />
+    <Compile Include="Protocol_Messages\TransactionOutput.cs" />
     <Compile Include="Protocol_Messages\VersionAck.cs" />
     <Compile Include="Protocol_Messages\VersionMessage.cs" />
   </ItemGroup>
