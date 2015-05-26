@@ -8,7 +8,6 @@ using System.Net.Sockets;
 using System.Net;
 using System.IO;
 using HtmlAgilityPack;
-using Open.Nat;
 using Bitcoin.BitcoinUtilities;
 using Bitcoin.Blox.Protocol_Messages;
 using Bitcoin.Blox.Data_Interface;
@@ -560,13 +559,16 @@ namespace Bitcoin.Blox.Network
 					//I only want to send my addr if I am listening for peers, this saves me sending myself out across the network when I am uncontactable
 					if (_networkParameters.ListenForPeers)
 					{
-						//send my addr to the peer I've just connected too, remember i include the port I am LISTENING on so they can connect to me	
+                        //send my addr to the peer I've just connected too, remember I include the port I am LISTENING on so they can connect to me	
+                        //I've poped in a relay delay to assist the seed scrapers who connect and do a getaddr because when I was sending my addr they just took it then killed connection thinking it was response to getaddr
+                        int addrRelayDelay = new Random(Environment.TickCount).Next(1500,2001);
+                        Thread.Sleep(addrRelayDelay);
 						PeerAddress my_net_addr = GetMyExternalIP();
 						Send(new AddressMessage(new List<PeerAddress>() { my_net_addr }, _networkParameters));
-						int getaddrDelay = new Random(Environment.TickCount).Next(500, 5001);
+						int getaddrDelay = new Random(Environment.TickCount).Next(100, 3001);
 						Thread.Sleep(getaddrDelay);
 						Send(new GetAddresses(_networkParameters));
-						Thread.Sleep((P2PNetworkParameters.AddrFartInterval - getaddrDelay));
+						Thread.Sleep((P2PNetworkParameters.AddrFartInterval - getaddrDelay)- addrRelayDelay);
 #if (DEBUG)
 						Console.WriteLine("Send Addr Wakes Up");
 #endif
@@ -945,25 +947,7 @@ namespace Bitcoin.Blox.Network
 				String page = "";
 
 				using (WebClient webCli = new WebClient())
-				{
-					try
-					{
-						page = await webCli.DownloadStringTaskAsync(new Uri("http://ipconfig.io", UriKind.Absolute));
-						page = page.Trim();
-
-						if (!page.Equals(""))
-						{
-							if ((page.Split(new char[] { '.' }).Length == 4) || (page.Split(new char[] { ':' }).Length == 8))
-							{
-								return new PeerAddress(IPAddress.Parse(page),_networkParameters.P2PListeningPort,_networkParameters.Services,_networkParameters);
-							}
-						}
-					}
-					catch
-					{
-						//allows falling through to next http request
-					}
-
+				{		
 					try
 					{
 						page = await webCli.DownloadStringTaskAsync(new Uri("http://checkip.dyndns.org", UriKind.Absolute));
@@ -984,7 +968,25 @@ namespace Bitcoin.Blox.Network
 						//allows falling through to next http request
 					}
 
-					try
+                    try
+                    {
+                        page = await webCli.DownloadStringTaskAsync(new Uri("http://ipconfig.io", UriKind.Absolute));
+                        page = page.Trim();
+
+                        if (!page.Equals(""))
+                        {
+                            if ((page.Split(new char[] { '.' }).Length == 4) || (page.Split(new char[] { ':' }).Length == 8))
+                            {
+                                return new PeerAddress(IPAddress.Parse(page), _networkParameters.P2PListeningPort, _networkParameters.Services, _networkParameters);
+                            }
+                        }
+                    }
+                    catch
+                    {
+                        //allows falling through to next http request
+                    }
+
+                    try
 					{
 						page = await webCli.DownloadStringTaskAsync(new Uri("http://www.showmemyip.com", UriKind.Absolute));
 
@@ -1023,25 +1025,7 @@ namespace Bitcoin.Blox.Network
 				String page = "";
 
 				using (WebClient webCli = new WebClient())
-				{
-					try
-					{
-						page = webCli.DownloadString(new Uri("http://ipconfig.io", UriKind.Absolute));
-						page = page.Trim();
-
-						if (!page.Equals(""))
-						{
-							if ((page.Split(new char[] { '.' }).Length == 4) || (page.Split(new char[] { ':' }).Length == 8))
-							{
-								return new PeerAddress(IPAddress.Parse(page), _networkParameters.P2PListeningPort, _networkParameters.Services,_networkParameters);
-							}
-						}
-					}
-					catch
-					{
-						//allows falling through to next http request
-					}
-
+				{			
 					try
 					{
 						page = webCli.DownloadString(new Uri("http://checkip.dyndns.org", UriKind.Absolute));
@@ -1062,7 +1046,25 @@ namespace Bitcoin.Blox.Network
 						//allows falling through to next http request
 					}
 
-					try
+                    try
+                    {
+                        page = webCli.DownloadString(new Uri("http://ipconfig.io", UriKind.Absolute));
+                        page = page.Trim();
+
+                        if (!page.Equals(""))
+                        {
+                            if ((page.Split(new char[] { '.' }).Length == 4) || (page.Split(new char[] { ':' }).Length == 8))
+                            {
+                                return new PeerAddress(IPAddress.Parse(page), _networkParameters.P2PListeningPort, _networkParameters.Services, _networkParameters);
+                            }
+                        }
+                    }
+                    catch
+                    {
+                        //allows falling through to next http request
+                    }
+
+                    try
 					{
 						page = webCli.DownloadString(new Uri("http://www.showmemyip.com", UriKind.Absolute));
 
@@ -1093,43 +1095,6 @@ namespace Bitcoin.Blox.Network
 			return new PeerAddress(IPAddress.Parse("127.0.0.1"), _networkParameters.P2PListeningPort, _networkParameters.Services, new P2PNetworkParameters(P2PNetworkParameters.ProtocolVersion,_networkParameters.IsTestNet));
 
 			//'Live Wire' - https://soundcloud.com/excision/live-wire
-		}
-
-		public static async Task<bool> SetNATPortForwardingUPnPAsync(int externalPort, int internalPort)
-		{
-			try
-			{
-				var nat = new NatDiscoverer();
-				var cts = new CancellationTokenSource(5000);
-				var device = await nat.DiscoverDeviceAsync(PortMapper.Upnp, cts);
-
-				//purge any old port mapping 
-				await device.DeletePortMapAsync(new Mapping(Protocol.Tcp, internalPort, externalPort));
-
-				//now we create the port mapping
-				await device.CreatePortMapAsync(new Mapping(Protocol.Tcp, internalPort, externalPort, 0, "Blox.NET Bitcoin Node Port Forward Rule"));
-
-				return true;
-
-			}
-#if (!DEBUG)
-			catch
-			{
-				return false;
-			}
-#else
-			catch (Exception ex)
-			{
-				Console.WriteLine("Exception UPnP Port Forwarding: " + ex.Message);
-				if (ex.InnerException != null)
-				{
-					Console.WriteLine("Inner Exception: " + ex.InnerException.Message);
-				}
-
-				return false;
-			}
-#endif
-
 		}
 
 		public VersionMessage MyVersionMessage

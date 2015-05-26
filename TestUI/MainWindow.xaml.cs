@@ -173,7 +173,7 @@ namespace TestUI
 
 		private async void button8_Click(object sender, RoutedEventArgs e)
 		{
-			await P2PConnection.SetNATPortForwardingUPnPAsync(_networkParameters.P2PListeningPort, _networkParameters.P2PListeningPort);
+			await P2PConnectionManager.SetNATPortForwardingUPnPAsync(_networkParameters.P2PListeningPort, _networkParameters.P2PListeningPort);
 		}
 
 		private async void button9_Click(object sender, RoutedEventArgs e)
